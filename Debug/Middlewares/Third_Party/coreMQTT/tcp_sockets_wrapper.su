@@ -1,0 +1,4 @@
+../Middlewares/Third_Party/coreMQTT/tcp_sockets_wrapper.c:86:12:TCP_Sockets_Connect	64	static,ignoring_inline_asm
+../Middlewares/Third_Party/coreMQTT/tcp_sockets_wrapper.c:188:6:TCP_Sockets_Disconnect	24	static
+../Middlewares/Third_Party/coreMQTT/tcp_sockets_wrapper.c:227:9:TCP_Sockets_Send	40	static,ignoring_inline_asm
+../Middlewares/Third_Party/coreMQTT/tcp_sockets_wrapper.c:291:9:TCP_Sockets_Recv	40	static,ignoring_inline_asm

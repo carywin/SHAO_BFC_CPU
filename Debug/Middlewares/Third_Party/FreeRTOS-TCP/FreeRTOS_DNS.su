@@ -1,0 +1,11 @@
+../Middlewares/Third_Party/FreeRTOS-TCP/FreeRTOS_DNS.c:161:18:FreeRTOS_gethostbyname	16	static
+../Middlewares/Third_Party/FreeRTOS-TCP/FreeRTOS_DNS.c:207:25:prvPrepareLookup	48	static
+../Middlewares/Third_Party/FreeRTOS-TCP/FreeRTOS_DNS.c:350:22:prvGetPayloadBuffer	32	static
+../Middlewares/Third_Party/FreeRTOS-TCP/FreeRTOS_DNS.c:386:17:prvFillSockAddress	24	static
+../Middlewares/Third_Party/FreeRTOS-TCP/FreeRTOS_DNS.c:423:21:prvDNSReply	32	static
+../Middlewares/Third_Party/FreeRTOS-TCP/FreeRTOS_DNS.c:470:23:prvSendBuffer	48	static
+../Middlewares/Third_Party/FreeRTOS-TCP/FreeRTOS_DNS.c:521:21:prvGetHostByNameOp	56	static
+../Middlewares/Third_Party/FreeRTOS-TCP/FreeRTOS_DNS.c:578:21:prvGetHostByNameOp_WithRetry	32	static
+../Middlewares/Third_Party/FreeRTOS-TCP/FreeRTOS_DNS.c:611:21:prvGetHostByName	32	static
+../Middlewares/Third_Party/FreeRTOS-TCP/FreeRTOS_DNS.c:651:20:prvCreateDNSMessage	56	static
+../Middlewares/Third_Party/FreeRTOS-TCP/FreeRTOS_DNS.c:765:14:ulDNSHandlePacket	24	static

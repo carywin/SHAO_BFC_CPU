@@ -1,0 +1,2 @@
+../Middlewares/Third_Party/FreeRTOS-TCP/FreeRTOS_TCP_Utils.c:65:22:prvTCPFlagMeaning	72	static
+../Middlewares/Third_Party/FreeRTOS-TCP/FreeRTOS_TCP_Utils.c:90:10:prvSocketSetMSS	24	static

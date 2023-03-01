@@ -1,0 +1,2 @@
+../Middlewares/Third_Party/coreMQTT/sockets_wrapper.c:65:12:Sockets_Connect	56	static
+../Middlewares/Third_Party/coreMQTT/sockets_wrapper.c:160:6:Sockets_Disconnect	24	static

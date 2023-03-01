@@ -1,0 +1,16 @@
+../Middlewares/Third_Party/FreeRTOS-TCP/FreeRTOS_TCP_Transmission.c:88:23:prvTCPMakeSurePrepared	24	static
+../Middlewares/Third_Party/FreeRTOS-TCP/FreeRTOS_TCP_Transmission.c:114:13:prvTCPSendPacket	40	static
+../Middlewares/Third_Party/FreeRTOS-TCP/FreeRTOS_TCP_Transmission.c:206:13:prvTCPSendRepeated	32	static
+../Middlewares/Third_Party/FreeRTOS-TCP/FreeRTOS_TCP_Transmission.c:254:10:prvTCPReturnPacket	144	static
+../Middlewares/Third_Party/FreeRTOS-TCP/FreeRTOS_TCP_Transmission.c:562:10:prvTCPCreateWindow	40	static
+../Middlewares/Third_Party/FreeRTOS-TCP/FreeRTOS_TCP_Transmission.c:601:23:prvTCPPrepareConnect	96	static
+../Middlewares/Third_Party/FreeRTOS-TCP/FreeRTOS_TCP_Transmission.c:748:24:prvWinScaleFactor	24	static
+../Middlewares/Third_Party/FreeRTOS-TCP/FreeRTOS_TCP_Transmission.c:791:17:prvSetSynAckOptions	24	static
+../Middlewares/Third_Party/FreeRTOS-TCP/FreeRTOS_TCP_Transmission.c:848:33:prvTCPBufferResize	40	static,ignoring_inline_asm
+../Middlewares/Third_Party/FreeRTOS-TCP/FreeRTOS_TCP_Transmission.c:949:13:prvTCPPrepareSend	96	static
+../Middlewares/Third_Party/FreeRTOS-TCP/FreeRTOS_TCP_Transmission.c:1166:10:prvTCPAddTxData	24	static
+../Middlewares/Third_Party/FreeRTOS-TCP/FreeRTOS_TCP_Transmission.c:1209:17:prvSetOptions	56	static
+../Middlewares/Third_Party/FreeRTOS-TCP/FreeRTOS_TCP_Transmission.c:1297:16:prvSendData	96	static
+../Middlewares/Third_Party/FreeRTOS-TCP/FreeRTOS_TCP_Transmission.c:1449:23:prvTCPSendSpecialPacketHelper	24	static
+../Middlewares/Third_Party/FreeRTOS-TCP/FreeRTOS_TCP_Transmission.c:1488:16:prvTCPSendChallengeAck	16	static
+../Middlewares/Third_Party/FreeRTOS-TCP/FreeRTOS_TCP_Transmission.c:1501:16:prvTCPSendReset	16	static

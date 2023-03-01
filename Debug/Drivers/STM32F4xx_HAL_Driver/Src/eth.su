@@ -1,0 +1,5 @@
+../Drivers/CMSIS/Include/core_cm4.h:1688:22:__NVIC_EnableIRQ	16	static
+../Drivers/CMSIS/Include/core_cm4.h:1816:22:__NVIC_SetPriority	16	static
+../Drivers/STM32F4xx_HAL_Driver/Src/eth.c:37:6:MX_ETH_Init	8	static
+../Drivers/STM32F4xx_HAL_Driver/Src/eth.c:81:6:HAL_ETH_MspInit	72	static
+../Drivers/STM32F4xx_HAL_Driver/Src/eth.c:137:6:HAL_ETH_MspDeInit	16	static

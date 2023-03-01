@@ -1,0 +1,4 @@
+../Middlewares/Third_Party/coreMQTT/interface/transport_plaintext.c:53:28:Plaintext_FreeRTOS_Connect	48	static
+../Middlewares/Third_Party/coreMQTT/interface/transport_plaintext.c:98:28:Plaintext_FreeRTOS_Disconnect	24	static
+../Middlewares/Third_Party/coreMQTT/interface/transport_plaintext.c:118:9:Plaintext_FreeRTOS_recv	32	static
+../Middlewares/Third_Party/coreMQTT/interface/transport_plaintext.c:152:9:Plaintext_FreeRTOS_send	32	static
