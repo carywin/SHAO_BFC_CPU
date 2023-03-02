@@ -288,6 +288,15 @@ const osThreadAttr_t Telemetry_attributes = {
   .stack_size = 768 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
+/* Definitions for Logging */
+osThreadId_t LoggingHandle;
+const osThreadAttr_t Logging_attributes = {
+  .name = "Logging",
+  .stack_size = 768 * 4,
+  .priority = (osPriority_t) osPriorityNormal,
+};
+
+
 /* Definitions for I2CSendComplete */
 osEventFlagsId_t I2CSendCompleteHandle;
 const osEventFlagsAttr_t I2CSendComplete_attributes = {
@@ -433,6 +442,7 @@ void StartDefaultTask(void *argument);
 void StartMQTTConn(void *argument);
 void StartPingWD(void *argument);
 void StartTelemetry(void *argument);
+void StartLogging(void *argument);
 
 extern void MX_USB_DEVICE_Init(void);
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
@@ -493,9 +503,8 @@ void MX_FREERTOS_Init(void) {
   TelemetryHandle = osThreadNew(StartTelemetry, NULL, &Telemetry_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
-		  //mqttClientSubTaskHandle = osThreadNew(MqttClientSubTask, NULL, &MQTTSubTask_attributes);
+  LoggingHandle = osThreadNew(StartLogging, NULL, &Logging_attributes);
 
-		  //mqttClientPubTaskHandle = osThreadNew(MqttClientPubTask, NULL, &MQTTPubTask_attributes);
   /* USER CODE END RTOS_THREADS */
 
   /* USER CODE BEGIN RTOS_EVENTS */
@@ -583,11 +592,11 @@ void StartDefaultTask(void *argument)
 	  HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
 	  //printf("T: %.lu\n", unixTime);
 	  if (unixTime > 10 && unixTime % 10 == 0) {
-		  RTC_DateTypeDef rtc_date;
-		  RTC_TimeTypeDef rtc_time;
-		  HAL_RTC_GetTime(&hrtc, &rtc_time, RTC_FORMAT_BIN);
-		  HAL_RTC_GetDate(&hrtc, &rtc_date, RTC_FORMAT_BIN);
-		  printf("Time: %.lu: %04d-%02d-%02d - %02d:%02d:%02d\n", unixTime, rtc_date.Year+2000, rtc_date.Month, rtc_date.Date, rtc_time.Hours, rtc_time.Minutes, rtc_time.Seconds);
+//		  RTC_DateTypeDef rtc_date;
+//		  RTC_TimeTypeDef rtc_time;
+//		  HAL_RTC_GetTime(&hrtc, &rtc_time, RTC_FORMAT_BIN);
+//		  HAL_RTC_GetDate(&hrtc, &rtc_date, RTC_FORMAT_BIN);
+//		  printf("Time: %.lu: %04d-%02d-%02d - %02d:%02d:%02d\n", unixTime, rtc_date.Year+2000, rtc_date.Month, rtc_date.Date, rtc_time.Hours, rtc_time.Minutes, rtc_time.Seconds);
 	//	  doBFTest();
 	  }
 	  if (unixTime >= nextPointTime) {
@@ -789,7 +798,7 @@ void StartTelemetry(void *argument)
 		   * is safe because the task waits for the callback to execute before continuing. */
 		  MQTTAgentCommandContext_t xCommandContext;
 		  MQTTAgentCommandInfo_t xCommandInformation;
-		  char topic[20] = "telemetry/";
+		  char topic[25] = "telemetry/";
 		  strcat(topic, bfc_name);
 
 		  memset( (void *) &xPublishInfo, 0x00, sizeof( xPublishInfo ) );
@@ -834,6 +843,14 @@ void StartTelemetry(void *argument)
 	  xTaskNotifyWait( 0, 0xFFFFFFFF, NULL, pdMS_TO_TICKS(TELEMETRY_PERIOD));
   }
   /* USER CODE END StartTelemetry */
+}
+
+void StartLogging(void *argument) {
+	BaseType_t xStatus;
+
+	for (;;) {
+		osDelay(1107);
+	}
 }
 
 /* Private application code --------------------------------------------------*/
@@ -1045,8 +1062,7 @@ void sendLog(char *logLevel, char *logMsg) {
 	if(xGlobalMqttAgentContext.mqttContext.connectStatus == MQTTConnected) {
 		cJSON *logPacketJSON = cJSON_CreateObject();
 		cJSON_AddStringToObject(logPacketJSON, logLevel, logMsg);
-		char *payload = NULL;
-		payload = cJSON_PrintUnformatted(logPacketJSON);
+		char *payload = cJSON_PrintUnformatted(logPacketJSON);
 
 		printf("Payload: %s\n", payload);
 

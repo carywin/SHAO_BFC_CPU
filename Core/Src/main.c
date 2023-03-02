@@ -307,14 +307,6 @@ void gen_bitstring(int xdelays[], int ydelays[], char *outstring)
 	printf("Outstring %d bits: %s\n", strlen(outstring), outstring);
 }
 
-void intTo6bits(int value, char *buffer) {
-	int i = 0;
-	for (int mask = 0x20; mask > 0; mask >>= 1) {
-		buffer[i++] = (value & mask) ? '1':'0';
-	}
-	buffer[i++] = '\0';
-}
-
 void intToXbits(int value, char *buffer, int bits) {
 	int i = 0;
 	for (int mask = 0x01 << (bits - 1); mask > 0; mask >>= 1) {
@@ -333,10 +325,10 @@ void send_bitstring_en(uint8_t bfEnable, float *bf_temp, uint8_t *bf_flags)
 // bit time 20 us
 {
 	const int bittime = 20; // us
-	const int clockHigh = bfEnable;
-	const int clockLow = bfEnable << 16;
-	int i,j, indata[26], rawtemps[8];
-	const int bitmask[32] = { 0x1, 0x2, 0x4, 0x8, \
+	const uint32_t clockHigh = bfEnable;
+	const uint32_t clockLow = bfEnable << 16;
+	int i,j, indata[30], rawtemps[8];
+	const uint32_t bitmask[32] = { 0x1, 0x2, 0x4, 0x8, \
 							  0x10, 0x20, 0x40, 0x80,\
 							  0x100, 0x200, 0x400, 0x800,\
 							  0x1000, 0x2000, 0x4000, 0x8000,\
@@ -347,10 +339,10 @@ void send_bitstring_en(uint8_t bfEnable, float *bf_temp, uint8_t *bf_flags)
 
 	taskENTER_CRITICAL(); // Disable interrupts while we send/receive data
 	// Clock out 253 bits on all data/clock lines
-	for (i=0; i<=252; i++) {
+	for (i=0; i<253; i++) {
 		int portD = 0;
 		for (j=0; j<=7; j++) {
-			if (beamformer[j].outstring[i] == '1' && (bfEnable && bitmask[i])) {
+			if (beamformer[j].outstring[i] == '1' && (bfEnable && bitmask[j])) {
 				portD |= bitmask[j+8];
 			}
 			else {
@@ -365,9 +357,9 @@ void send_bitstring_en(uint8_t bfEnable, float *bf_temp, uint8_t *bf_flags)
 		delay_us(bittime / 4);
 	}
 
-	// Clock in temperature and flags data
+	// Clock in 24 bits of temperature and flags data
 	GPIOD->BSRR = 0xFFFF0000; // Set Port D all bits/clocks low
-	for (i=0; i<=25; i++) {
+	for (i=0; i<24; i++) {
 		delay_us(bittime / 4);
 		GPIOD->BSRR = clockHigh;
 		delay_us(bittime / 4);
@@ -376,6 +368,7 @@ void send_bitstring_en(uint8_t bfEnable, float *bf_temp, uint8_t *bf_flags)
 		GPIOD->BSRR = clockLow;
 		delay_us(bittime / 4);
 	}
+
 	GPIOD->BSRR = 0xFFFF0000; // Set Port D all bits/clocks low
 	taskEXIT_CRITICAL(); // Enable interrupts again, whole process should take ~5 ms
 
@@ -399,7 +392,7 @@ void send_bitstring_en(uint8_t bfEnable, float *bf_temp, uint8_t *bf_flags)
 			bf_temp[i] = -256.0;
 		}
 	}
-	// Next 8 bits are flags (7:4 - checksum ok(0x8)/bad(0xE or 0x0), 3:0 - invalid, set to 0)
+	// Next 8 bits are flags (7:4 - checksum ok(128)/bad(224 or 0), 3:0 - invalid, set to 0)
 	for (i=16; i<=23; i++) { // Next 8 bits of indata
 		for (j=0; j<=7; j++) { // Do for all enabled beamformers
 			if (bfEnable & bitmask[j]) {
@@ -448,7 +441,7 @@ void parsePointing(const uint8_t *data, int len) {
 					}
 					gen_bitstring(xdelays, ydelays, beamformer[bfNumJSON->valueint - 1].outstring);
 				} else {
-					sendLog("Error", "MQTT Pointing Command Error: \'bf\' and/or \'time\' not a valid number");
+					//sendLog("Error", "MQTT Pointing Command Error: \'bf\' and/or \'time\' not a valid number");
 					printf("MQTT Pointing Command Error: \'bf\' and/or \'time\' not a valid number");
 				}
 			}
@@ -566,7 +559,7 @@ void doBFTest() {
 		sendPointingResult();
 	} else {
 		printf("Can't do BF Test, next pointing is too soon\n");
-		sendLog("Error", "Can't do BF Test, next pointing is too soon");
+		//sendLog("Error", "Can't do BF Test, next pointing is too soon");
 	}
 }
 
