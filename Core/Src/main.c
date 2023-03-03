@@ -22,6 +22,7 @@
 #include "crc.h"
 #include "eth.h"
 #include "i2c.h"
+#include "iwdg.h"
 #include "rng.h"
 #include "rtc.h"
 #include "tim.h"
@@ -155,6 +156,7 @@ int main(void)
   MX_TIM6_Init();
   MX_TIM2_Init();
   MX_ETH_Init();
+  MX_IWDG_Init();
   /* USER CODE BEGIN 2 */
   HAL_TIM_Base_Start(&htim6); // Start the 1 us timer
   HAL_TIM_Base_Start_IT(&htim2); // Start the 1 s overflow unixTime timer, enable interrupt
@@ -166,6 +168,9 @@ int main(void)
   /* Init scheduler */
   osKernelInitialize();  /* Call init function for freertos objects (in freertos.c) */
   MX_FREERTOS_Init();
+
+  // Pat the watchdog
+  HAL_IWDG_Refresh(&hiwdg);
 
   /* Start scheduler */
   osKernelStart();
@@ -199,9 +204,10 @@ void SystemClock_Config(void)
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE|RCC_OSCILLATORTYPE_LSE;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSI | RCC_OSCILLATORTYPE_HSE | RCC_OSCILLATORTYPE_LSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
   RCC_OscInitStruct.LSEState = RCC_LSE_ON;
+  RCC_OscInitStruct.LSIState = RCC_LSI_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
   RCC_OscInitStruct.PLL.PLLM = 4;

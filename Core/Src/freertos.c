@@ -47,6 +47,7 @@
 #include "rtc.h"
 #include <stdio.h>
 #include "time.h"
+#include "iwdg.h"
 
 /*********************** coreMQTT Agent Configurations **********************/
 /**
@@ -236,6 +237,14 @@ char bfc_name[10] = "bfc";
 static char cmdTopic[25] = "command/";
 
 unsigned long cmdCounter = 0; // Counter increments every time a message is published by the BFC
+
+// Task monitoring - the default task will check that other tasks are running, which they indicate
+// by setting their flag in taskMonitor. If they don't set it, the watchdog won't get pats.
+uint8_t taskMonitor = 0; // Flags set by each task to indicate they are running
+#define mask_TaskFlags 0x07 // Mask that matches all flags being set
+#define taskflag_MQTT 0x01
+#define taskflag_Telemetry 0x02
+#define taskflag_Logging 0x04
 
 /* The MAC address array is not declared const as the MAC address will
 normally be read from an EEPROM and not hard coded (in real deployed
@@ -535,6 +544,8 @@ void StartDefaultTask(void *argument)
   MX_USB_DEVICE_Init();
   /* USER CODE BEGIN StartDefaultTask */
 
+  HAL_IWDG_Refresh(&hiwdg); // Pat the watchdog
+
   // Calculate a quasi-unique 32-bit value to use as MAC and create BFC name
   bfc_uid = HAL_CRC_Calculate(&hcrc, uid, 3);
   uint8_t idByte1 = (bfc_uid >> 16) & 0xFF;
@@ -602,10 +613,17 @@ void StartDefaultTask(void *argument)
 	  if (unixTime >= nextPointTime) {
 		  printf("%.lu: Time to send next pointing\n",unixTime);
 		  sendBFPointing();
+		  nextPointTime = LONG_TIME_AWAY;
 		  for (int i=0; i<=7; i++) {
-			  if (beamformer[i].nextPointTime > nextPointTime) nextPointTime = beamformer[i].nextPointTime;
+			  if (beamformer[i].nextPointTime < nextPointTime) nextPointTime = beamformer[i].nextPointTime;
 		  }
 		  if (nextPointTime <= unixTime) nextPointTime = LONG_TIME_AWAY;
+	  }
+	  if(xGlobalMqttAgentContext.mqttContext.connectStatus == MQTTConnected) {
+		  if(taskMonitor == mask_TaskFlags) {
+			  HAL_IWDG_Refresh(&hiwdg); // Pat the watchdog
+			  taskMonitor = 0;
+		  }
 	  }
 	  osDelay(1000);
   }
@@ -622,7 +640,6 @@ void StartDefaultTask(void *argument)
 void StartMQTTConn(void *argument)
 {
   /* USER CODE BEGIN StartMQTTConn */
-	/* Miscellaneous initialization. */
 	ulGlobalEntryTimeMs = prvGetTimeMs();
 
 	xNetworkContext.pParams = &xPlaintextTransportParams;
@@ -666,6 +683,8 @@ void StartMQTTConn(void *argument)
 	* which the error happened is returned so there can be an attempt to
 	* clean up and reconnect however the application writer prefers. */
 	xMQTTStatus = MQTTAgent_CommandLoop( &xGlobalMqttAgentContext );
+
+	taskMonitor &= taskflag_MQTT; // Set the task flag to indicate task is still running
 
 	/* Success is returned for disconnect or termination. The socket should
 	* be disconnected. */
@@ -839,8 +858,18 @@ void StartTelemetry(void *argument)
 
 	  }
 	  // Wait until we're flagged to send telemetry again, or after the set period
-	  //osEventFlagsWait(TelemetryHandle, EVENT_FLAG, osFlagsWaitAny, TELEMETRY_PERIOD);
-	  xTaskNotifyWait( 0, 0xFFFFFFFF, NULL, pdMS_TO_TICKS(TELEMETRY_PERIOD));
+	  // We need to wake up every 10s or so to set the task flag, so the watchdog gets pats
+	  int msCounter = 0;
+	  while (msCounter < TELEMETRY_PERIOD) {
+		  if (msCounter + 10000 > TELEMETRY_PERIOD) {
+			  taskMonitor &= taskflag_Telemetry; // Set the task flag to indicate task is still running
+			  xTaskNotifyWait( 0, 0xFFFFFFFF, NULL, pdMS_TO_TICKS(10000));
+			  msCounter += 10000;
+		  } else {
+			  taskMonitor &= taskflag_Telemetry; // Set the task flag to indicate task is still running
+			  xTaskNotifyWait( 0, 0xFFFFFFFF, NULL, pdMS_TO_TICKS(TELEMETRY_PERIOD - msCounter));
+		  }
+	  }
   }
   /* USER CODE END StartTelemetry */
 }
@@ -849,7 +878,8 @@ void StartLogging(void *argument) {
 	BaseType_t xStatus;
 
 	for (;;) {
-		osDelay(1107);
+		osDelay(5107);
+		taskMonitor &= taskflag_Logging; // Set the task flag to indicate task is still running
 	}
 }
 

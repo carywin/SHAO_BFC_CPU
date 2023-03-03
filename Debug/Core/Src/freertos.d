@@ -37,6 +37,7 @@ Core/Src/freertos.o: ../Core/Src/freertos.c \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_flash_ramfunc.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_i2c.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_i2c_ex.h \
+ ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_iwdg.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_pwr.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_pwr_ex.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_rng.h \
@@ -94,7 +95,7 @@ Core/Src/freertos.o: ../Core/Src/freertos.c \
  ../Middlewares/Third_Party/coreMQTT-Agent/include/core_mqtt_agent_command_functions.h \
  ../Middlewares/Third_Party/coreMQTT-Agent/include/core_mqtt_agent.h \
  ../Middlewares/Third_Party/cJSON/cJSON.h ../Core/Inc/i2c.h \
- ../Core/Inc/bfc_config.h ../Core/Inc/rtc.h \
+ ../Core/Inc/bfc_config.h ../Core/Inc/rtc.h ../Core/Inc/iwdg.h \
  ../Middlewares/Third_Party/coreMQTT-Agent/include/freertos_agent_message.h \
  ../Middlewares/Third_Party/coreMQTT-Agent/include/freertos_command_pool.h \
  ../Middlewares/Third_Party/coreMQTT/include/backoff_algorithm.h \
@@ -142,6 +143,7 @@ Core/Src/freertos.o: ../Core/Src/freertos.c \
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_flash_ramfunc.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_i2c.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_i2c_ex.h:
+../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_iwdg.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_pwr.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_pwr_ex.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_rng.h:
@@ -203,6 +205,7 @@ Core/Src/freertos.o: ../Core/Src/freertos.c \
 ../Core/Inc/i2c.h:
 ../Core/Inc/bfc_config.h:
 ../Core/Inc/rtc.h:
+../Core/Inc/iwdg.h:
 ../Middlewares/Third_Party/coreMQTT-Agent/include/freertos_agent_message.h:
 ../Middlewares/Third_Party/coreMQTT-Agent/include/freertos_command_pool.h:
 ../Middlewares/Third_Party/coreMQTT/include/backoff_algorithm.h:
