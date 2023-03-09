@@ -140,9 +140,7 @@ int main(void)
   SystemClock_Config();
 
   /* USER CODE BEGIN SysInit */
-  ActivateEthPhy();
-  GPIOD->BSRR = 0xFFFF0000; // Set Port D all bits/clocks low
-  HAL_Delay(200);
+
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
@@ -161,6 +159,9 @@ int main(void)
   HAL_TIM_Base_Start(&htim6); // Start the 1 us timer
   HAL_TIM_Base_Start_IT(&htim2); // Start the 1 s overflow unixTime timer, enable interrupt
 
+  ActivateEthPhy();
+  GPIOD->BSRR = 0xFFFF0000; // Set Port D all bits/clocks low
+  HAL_Delay(200);
 
 
   /* USER CODE END 2 */

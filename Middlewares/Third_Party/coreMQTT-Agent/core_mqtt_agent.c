@@ -49,6 +49,8 @@
 /* MQTT Agent default logging configuration include. */
 #include "core_mqtt_agent_default_logging.h"
 
+extern uint8_t taskMonitor;
+#define taskflag_MQTT 0x01
 /*-----------------------------------------------------------*/
 
 #if ( MQTT_AGENT_USE_QOS_1_2_PUBLISH != 0 )
@@ -1062,6 +1064,8 @@ MQTTStatus_t MQTTAgent_CommandLoop( MQTTAgentContext_t * pMqttAgentContext )
         {
             LogError( ( "MQTT operation failed with status %s\n",
                         MQTT_Status_strerror( operationStatus ) ) );
+        } else {
+        	taskMonitor |= taskflag_MQTT; // Set the task flag to indicate task is still running
         }
 
         /* Terminate the loop on disconnects, errors, or the termination command. */

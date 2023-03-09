@@ -512,7 +512,6 @@ void MX_FREERTOS_Init(void) {
   TelemetryHandle = osThreadNew(StartTelemetry, NULL, &Telemetry_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
-  LoggingHandle = osThreadNew(StartLogging, NULL, &Logging_attributes);
 
   /* USER CODE END RTOS_THREADS */
 
@@ -615,7 +614,7 @@ void StartDefaultTask(void *argument)
 		  sendBFPointing();
 		  nextPointTime = LONG_TIME_AWAY;
 		  for (int i=0; i<=7; i++) {
-			  if (beamformer[i].nextPointTime < nextPointTime) nextPointTime = beamformer[i].nextPointTime;
+			  if (beamformer[i].nextPointTime < nextPointTime && beamformer[i].nextPointTime > unixTime + 1) nextPointTime = beamformer[i].nextPointTime;
 		  }
 		  if (nextPointTime <= unixTime) nextPointTime = LONG_TIME_AWAY;
 	  }
@@ -684,27 +683,19 @@ void StartMQTTConn(void *argument)
 	* clean up and reconnect however the application writer prefers. */
 	xMQTTStatus = MQTTAgent_CommandLoop( &xGlobalMqttAgentContext );
 
-	taskMonitor &= taskflag_MQTT; // Set the task flag to indicate task is still running
-
 	/* Success is returned for disconnect or termination. The socket should
 	* be disconnected. */
-	if( ( xMQTTStatus == MQTTSuccess ) && ( xGlobalMqttAgentContext.mqttContext.connectStatus == MQTTNotConnected ) )
-	{
+	if( ( xMQTTStatus == MQTTSuccess ) && ( xGlobalMqttAgentContext.mqttContext.connectStatus == MQTTNotConnected ) ) {
 		/* MQTT Disconnect. Disconnect the socket. */
 		xNetworkStatus = prvSocketDisconnect( &xNetworkContext );
 		configASSERT( xNetworkStatus == pdPASS );
-	}
-	else if( xMQTTStatus == MQTTSuccess )
-	{
+	} else if( xMQTTStatus == MQTTSuccess )	{
 	  /* MQTTAgent_Terminate() was called, but MQTT was not disconnected. */
 	  xMQTTStatus = MQTT_Disconnect( &( xGlobalMqttAgentContext.mqttContext ) );
 	  configASSERT( xMQTTStatus == MQTTSuccess );
 	  xNetworkStatus = prvSocketDisconnect( &xNetworkContext );
 	  configASSERT( xNetworkStatus == pdPASS );
-	}
-	/* Handle Error. */
-	else
-	{
+	} else {	/* Handle Error. */
 	  /* Reconnect TCP. */
 		xNetworkStatus = prvSocketDisconnect( &xNetworkContext );
 		configASSERT( xNetworkStatus == pdPASS );
@@ -861,14 +852,14 @@ void StartTelemetry(void *argument)
 	  // We need to wake up every 10s or so to set the task flag, so the watchdog gets pats
 	  int msCounter = 0;
 	  while (msCounter < TELEMETRY_PERIOD) {
-		  if (msCounter + 10000 > TELEMETRY_PERIOD) {
-			  taskMonitor &= taskflag_Telemetry; // Set the task flag to indicate task is still running
+		  if (msCounter + 10000 < TELEMETRY_PERIOD) {
+			  taskMonitor |= taskflag_Telemetry; // Set the task flag to indicate task is still running
 			  xTaskNotifyWait( 0, 0xFFFFFFFF, NULL, pdMS_TO_TICKS(10000));
-			  msCounter += 10000;
 		  } else {
-			  taskMonitor &= taskflag_Telemetry; // Set the task flag to indicate task is still running
+			  taskMonitor |= taskflag_Telemetry; // Set the task flag to indicate task is still running
 			  xTaskNotifyWait( 0, 0xFFFFFFFF, NULL, pdMS_TO_TICKS(TELEMETRY_PERIOD - msCounter));
 		  }
+		  msCounter += 10001;
 	  }
   }
   /* USER CODE END StartTelemetry */
@@ -879,7 +870,7 @@ void StartLogging(void *argument) {
 
 	for (;;) {
 		osDelay(5107);
-		taskMonitor &= taskflag_Logging; // Set the task flag to indicate task is still running
+		taskMonitor |= taskflag_Logging; // Set the task flag to indicate task is still running
 	}
 }
 
@@ -1183,6 +1174,9 @@ static BaseType_t xTasksAlreadyCreated = pdFALSE;
         	/* creation of ManageMQTTConn */
         	ManageMQTTConnHandle = osThreadNew(StartMQTTConn, NULL, &ManageMQTTConn_attributes);
 
+        	// Start logging thread
+        	LoggingHandle = osThreadNew(StartLogging, NULL, &Logging_attributes);
+
             xTasksAlreadyCreated = pdTRUE;
         }
     }
@@ -1284,15 +1278,16 @@ void parseTime(const uint8_t *data, int len) {
 			rtc_time.Seconds = sec % 60;
 			rtc_time.SubSeconds = 107;
 			rtc_time.DayLightSaving = RTC_DAYLIGHTSAVING_NONE;
-			rtc_time.StoreOperation = RTC_STOREOPERATION_RESET;
+			//rtc_time.StoreOperation = RTC_STOREOPERATION_RESET;
 
 			localtime_r((time_t*) &sec, &dateTime);
+			if (dateTime.tm_wday == 0) rtc_date.WeekDay = 7; else rtc_date.WeekDay = dateTime.tm_wday;
 			rtc_date.Date = dateTime.tm_mday;
 			rtc_date.Month = dateTime.tm_mon +1;
 			rtc_date.Year = dateTime.tm_year % 100;
 
-			HAL_RTC_SetDate(&hrtc, &rtc_date, RTC_FORMAT_BIN);
 			HAL_RTC_SetTime(&hrtc, &rtc_time, RTC_FORMAT_BIN);
+			HAL_RTC_SetDate(&hrtc, &rtc_date, RTC_FORMAT_BIN);
 			printf("Time set %.lu - %04d-%02d-%02d - %02d:%02d:%02d\n", unixTime, rtc_date.Year+2000, rtc_date.Month, rtc_date.Date, rtc_time.Hours, rtc_time.Minutes, rtc_time.Seconds);
 		}
 	}
