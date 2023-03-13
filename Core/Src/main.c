@@ -56,8 +56,10 @@
 
 /* USER CODE BEGIN PV */
 
-struct bf_struct beamformer[8];
-struct bfc_struct bfController;
+//uint8_t ucHeap[ configTOTAL_HEAP_SIZE ] __attribute__ ((section (".ccmram")));
+
+struct bf_struct beamformer[8] __attribute__ ((section (".ccmram")));
+struct bfc_struct bfController __attribute__ ((section (".ccmram")));
 unsigned long unixTime = 0;
 unsigned long nextPointTime = LONG_TIME_AWAY;
 
@@ -79,7 +81,7 @@ void doBFTest();
 void sendBFPointing();
 
 extern void sendPointingResult();
-extern void sendLog(char *logLevel, char *logMsg);
+extern void sendLog(const char *logLevel, const char *logMsg);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -311,7 +313,7 @@ void gen_bitstring(int xdelays[], int ydelays[], char *outstring)
 	// Add termination null
 	outstring[i] = '\0';
 
-	printf("Outstring %d bits: %s\n", strlen(outstring), outstring);
+	//printf("Outstring %d bits: %s\n", strlen(outstring), outstring);
 }
 
 void intToXbits(int value, char *buffer, int bits) {
@@ -434,6 +436,7 @@ void parsePointing(const uint8_t *data, int len) {
 						int i = 0;
 						cJSON_ArrayForEach(delayValue, xdelayArray) {
 							xdelays[i] = delayValue->valueint;
+							beamformer[bfNumJSON->valueint - 1].nextXDelays[i] = delayValue->valueint;
 							i++;
 						}
 					}
@@ -443,19 +446,24 @@ void parsePointing(const uint8_t *data, int len) {
 						int i = 0;
 						cJSON_ArrayForEach(delayValue, ydelayArray) {
 							ydelays[i] = delayValue->valueint;
+							beamformer[bfNumJSON->valueint - 1].nextYDelays[i] = delayValue->valueint;
 							i++;
 						}
 					}
 					gen_bitstring(xdelays, ydelays, beamformer[bfNumJSON->valueint - 1].outstring);
+					char message[50];
+					snprintf(message, 50, "BF: %d point scheduled %f", bfNumJSON->valueint, sendTimeJSON->valuedouble);
+					sendLog("info",message);
 				} else {
-					//sendLog("Error", "MQTT Pointing Command Error: \'bf\' and/or \'time\' not a valid number");
-					printf("MQTT Pointing Command Error: \'bf\' and/or \'time\' not a valid number");
+					sendLog("error", "MQTT Pointing Command Error: \'bf\' and/or \'time\' not valid");
+					printf("MQTT Pointing Command Error: \'bf\' and/or \'time\' not valid");
 				}
 			}
 		} else {
 			const char *error_ptr = cJSON_GetErrorPtr();
 			if (error_ptr != NULL) {
 				printf("JSON Parse error before: %s\n", error_ptr);
+				sendLog("error", "point JSON parse error");
 			}
 		}
 		cJSON_Delete(command);
@@ -484,11 +492,13 @@ void parseBFPower(const uint8_t *data, int len){
 					j++;
 				}
 				GPIOE->BSRR = portE; // Set bit in lowest 16 bits to set pin, set in highest 16 bits to clear pin
+				sendLog("info", "bf_power set OK");
 			}
 		} else {
 			const char *error_ptr = cJSON_GetErrorPtr();
 			if (error_ptr != NULL) {
-				printf("BFPower JSON Parse error before: %s\n", error_ptr);
+				printf("bf_power JSON Parse error before: %s\n", error_ptr);
+				sendLog("error", "bf_power JSON parse error");
 			}
 		}
 		cJSON_Delete(command);
@@ -521,11 +531,13 @@ void parseDoCPower(const uint8_t *data, int len){
 					j++;
 				}
 				GPIOE->BSRR = portE; // Set bit in lowest 16 bits to set pin, set in highest 16 bits to clear pin
+				sendLog("info", "doc_power set OK");
 			}
 		} else {
 			const char *error_ptr = cJSON_GetErrorPtr();
 			if (error_ptr != NULL) {
 				printf("DoCPower JSON Parse error before: %s\n", error_ptr);
+				sendLog("error", "doc_power JSON parse error");
 			}
 		}
 		cJSON_Delete(command);
@@ -539,35 +551,31 @@ void doBFTest() {
 	char saved_bitstrings[8][255];
 	int i, j = 0;
 
-	if (nextPointTime - unixTime > 10) {
-		gen_bitstring(testxdelays, testydelays, output);
-		// Save the current beamformer outstrings and set them to 0 delays
-		for (i=0; i<=7; i++) {
-			for (j=0; j<=255; j++) {
-				saved_bitstrings[i][j] = beamformer[i].outstring[j];
-				beamformer[i].outstring[j] = output[j];
-			}
+	gen_bitstring(testxdelays, testydelays, output);
+	// Save the current beamformer outstrings and set them to 0 delays
+	for (i=0; i<=7; i++) {
+		for (j=0; j<255; j++) {
+			saved_bitstrings[i][j] = beamformer[i].outstring[j];
+			beamformer[i].outstring[j] = output[j];
 		}
-		send_bitstring_en(0xFF, bfController.lastBFTemps, bfController.lastBFFlags);
-		bfController.lastPointTime = unixTime;
-		// Restore the previous beamformer outstrings
-		for (i=0; i<=7; i++) {
-			for (j=0; j<=255; j++) {
-				beamformer[i].outstring[j] = saved_bitstrings[i][j];
-			}
-		}
-		for (i=0; i<=7; i++) {
-			for (j=0; j<=15; j++) {
-				beamformer[i].lastXDelays[j] = 0;
-				beamformer[i].lastYDelays[j] = 0;
-			}
-			beamformer[i].lastPointTime = unixTime;
-		}
-		sendPointingResult();
-	} else {
-		printf("Can't do BF Test, next pointing is too soon\n");
-		//sendLog("Error", "Can't do BF Test, next pointing is too soon");
 	}
+	send_bitstring_en(0xFF, bfController.lastBFTemps, bfController.lastBFFlags);
+	bfController.lastPointTime = unixTime;
+	bfController.lastBFEnable = 0xFF;
+	// Restore the previous beamformer outstrings
+	for (i=0; i<=7; i++) {
+		for (j=0; j<255; j++) {
+			beamformer[i].outstring[j] = saved_bitstrings[i][j];
+		}
+	}
+	for (i=0; i<=7; i++) {
+		for (j=0; j<=15; j++) {
+			beamformer[i].lastXDelays[j] = 0;
+			beamformer[i].lastYDelays[j] = 0;
+		}
+		beamformer[i].lastPointTime = unixTime;
+	}
+	sendPointingResult();
 }
 
 void sendBFPointing() {

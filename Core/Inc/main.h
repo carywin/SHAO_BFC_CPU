@@ -56,7 +56,7 @@ struct bf_struct {
 
 struct bfc_struct {
 	float temp;
-	int lastPointTime;
+	uint32_t lastPointTime;
 	float lastBFTemps[8];
 	uint8_t lastBFFlags[8];
 	uint8_t lastBFEnable;

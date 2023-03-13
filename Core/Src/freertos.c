@@ -131,7 +131,7 @@ struct NetworkContext
  * @brief Size of statically allocated buffers for holding topic names and
  * payloads.
  */
-#define STRING_BUFFER_LENGTH                   ( 1000 )
+#define STRING_BUFFER_LENGTH                   ( 1200 )
 
 /**
  * @brief Delay for each task between publishes.
@@ -150,7 +150,7 @@ struct NetworkContext
  * @note Specified in bytes.  Must be large enough to hold the maximum
  * anticipated MQTT payload.
  */
-#define MQTT_AGENT_NETWORK_BUFFER_SIZE    ( 5000U )
+#define MQTT_AGENT_NETWORK_BUFFER_SIZE    ( 2000U )
 
 /**
  * @brief The length of the queue used to hold commands for the agent.
@@ -268,6 +268,15 @@ static PlaintextTransportParams_t xPlaintextTransportParams;
 static NetworkContext_t xNetworkContext;
 //SubscriptionElement_t xGlobalSubscriptionList[ SUBSCRIPTION_MANAGER_MAX_SUBSCRIPTIONS ];
 
+// Logging message ring buffer, for thread-safe sending of log messages
+#define LOGBUFFSIZE 4 // Zero-referenced
+struct logMessageStruct {
+	char logLevel[6];
+	char logMessage[100];
+};
+struct logMessageStruct logBuffer[LOGBUFFSIZE+2];
+uint8_t logHead, logTail = 0;
+
 /* USER CODE END Variables */
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
@@ -280,7 +289,7 @@ const osThreadAttr_t defaultTask_attributes = {
 osThreadId_t ManageMQTTConnHandle;
 const osThreadAttr_t ManageMQTTConn_attributes = {
   .name = "ManageMQTTConn",
-  .stack_size = 768 * 4,
+  .stack_size = 1024 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
 /* Definitions for PingWatchdog */
@@ -317,10 +326,10 @@ const osEventFlagsAttr_t I2CReceiveComplete_attributes = {
   .name = "I2CReceiveComplete"
 };
 /* Definitions for SendTelemetry */
-osEventFlagsId_t SendTelemetryHandle;
-const osEventFlagsAttr_t SendTelemetry_attributes = {
-  .name = "SendTelemetry"
-};
+//osEventFlagsId_t SendTelemetryHandle;
+//const osEventFlagsAttr_t SendTelemetry_attributes = {
+//  .name = "SendTelemetry"
+//};
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
@@ -330,7 +339,8 @@ void readI2Csensor(int sensorNum, float *bf_volts, int *bf_amps, int *bf_fault);
 int checkPowerAlarm();
 float readTempSensor();
 void sendPointingResult();
-void sendLog(char *logLevel, char *logMsg);
+void sendLog(const char *logLevel, const char *logMsg);
+void parseBFTest();
 
 /*-----------------------------------------------------------*/
 
@@ -524,7 +534,7 @@ void MX_FREERTOS_Init(void) {
   I2CReceiveCompleteHandle = osEventFlagsNew(&I2CReceiveComplete_attributes);
 
   /* creation of SendTelemetry */
-  SendTelemetryHandle = osEventFlagsNew(&SendTelemetry_attributes);
+  //SendTelemetryHandle = osEventFlagsNew(&SendTelemetry_attributes);
 
   /* USER CODE END RTOS_EVENTS */
 
@@ -537,8 +547,9 @@ void MX_FREERTOS_Init(void) {
   * @retval None
   */
 /* USER CODE END Header_StartDefaultTask */
-void StartDefaultTask(void *argument)
-{
+void StartDefaultTask(void *argument) {
+BaseType_t xReturn;
+
   /* init code for USB_DEVICE */
   MX_USB_DEVICE_Init();
   /* USER CODE BEGIN StartDefaultTask */
@@ -624,7 +635,11 @@ void StartDefaultTask(void *argument)
 			  taskMonitor = 0;
 		  }
 	  }
-	  osDelay(1000);
+	  xReturn = xTaskNotifyWait( 0, 0xFFFFFFFF, NULL, pdMS_TO_TICKS(1000));
+	  if (xReturn == pdTRUE) {
+		  // We were flagged to do a BFTest
+		  doBFTest();
+	  }
   }
   /* USER CODE END StartDefaultTask */
 }
@@ -866,12 +881,80 @@ void StartTelemetry(void *argument)
 }
 
 void StartLogging(void *argument) {
-	BaseType_t xStatus;
 
 	for (;;) {
-		osDelay(5107);
+		while (logTail != logHead) { // There are log messages in the buffer to send
+			// Publish a character string log message to log/bfc#
+			if(xGlobalMqttAgentContext.mqttContext.connectStatus == MQTTConnected) {
+				cJSON *logPacketJSON = cJSON_CreateObject();
+				cJSON_AddNumberToObject(logPacketJSON, "time", unixTime);
+				cJSON_AddStringToObject(logPacketJSON, logBuffer[logTail].logLevel, logBuffer[logTail].logMessage);
+				char *payload = cJSON_PrintUnformatted(logPacketJSON);
+
+				printf("Payload: %s\n", payload);
+
+				MQTTPublishInfo_t xPublishInfo;
+				/* The context for the completion callback must stay in scope until
+				* the completion callback is invoked. In this case, using a stack variable
+				* is safe because the task waits for the callback to execute before continuing. */
+				MQTTAgentCommandContext_t xCommandContext;
+				MQTTAgentCommandInfo_t xCommandInformation;
+				BaseType_t xReturn;
+				char topic[20] = "log/";
+				strcat(topic, bfc_name);
+
+				memset( (void *) &xPublishInfo, 0x00, sizeof( xPublishInfo ) );
+				xPublishInfo.qos = MQTTQoS0;
+				xPublishInfo.pTopicName = topic;
+				xPublishInfo.topicNameLength = (uint16_t) strlen(topic);
+				xPublishInfo.pPayload = payload;
+				xPublishInfo.payloadLength = strlen(payload);
+
+				memset( (void *) &xCommandContext, 0x00, sizeof( xCommandContext ) );
+				xCommandContext.xTaskToNotify = xTaskGetCurrentTaskHandle();
+				xCommandContext.ulCmdCounter = cmdCounter++;
+
+				xCommandInformation.cmdCompleteCallback = prvPublishCommandCallback;
+				xCommandInformation.pCmdCompleteCallbackContext = &xCommandContext;
+				xCommandInformation.blockTimeMs = MAX_COMMAND_SEND_BLOCK_TIME_MS;
+
+				MQTTStatus_t xCommandAdded = MQTTAgent_Publish(&xGlobalMqttAgentContext, &xPublishInfo, &xCommandInformation );
+
+				if( xCommandAdded == MQTTSuccess ) {
+				  //printf("%s", "MQTT Publish command sent to agent thread successfully\n");
+				  /* The command was successfully sent to the agent.  Note the data
+				  pointed to by xPublishInfo.pTopicName and xPublishInfo.pPayload must
+				  remain valid (not be lost from a stack frame or overwritten in a buffer)
+				  until the PUBLISH is acknowledged. */
+				  xReturn = xTaskNotifyWait( 0, 0, NULL, portMAX_DELAY ); /* Wait indefinitely. */
+
+				  if( xReturn != pdFAIL )
+				  {
+					  /* The message was acknowledged and
+					  xCommandContext.xReturnStatus holds the result of the operation. */
+					  //printf("%s", "MQTT Publish command successfully acknowledged by broker\n");
+					  if (++logTail > LOGBUFFSIZE) logTail = 0;
+				  }
+				} else {
+					printf("%s","Failed to enqueue message for MQTT Agent Publish - Log Message\n");
+				}
+
+				cJSON_Delete(logPacketJSON);
+				cJSON_free(payload);
+				osThreadYield();
+			}
+		}
+		osDelay(107);
 		taskMonitor |= taskflag_Logging; // Set the task flag to indicate task is still running
 	}
+}
+
+void sendLog(const char *logLevel, const char *logMsg) {
+
+	strncpy(logBuffer[logTail].logLevel, logLevel, 6);
+	strncpy(logBuffer[logTail].logMessage, logMsg, 100);
+	if (++logHead > LOGBUFFSIZE) logHead = 0;
+	printf("%s: %s\n", logLevel, logMsg);
 }
 
 /* Private application code --------------------------------------------------*/
@@ -1078,65 +1161,6 @@ void sendPointingResult() {
 	}
 }
 
-void sendLog(char *logLevel, char *logMsg) {
-	// Publish a character string log message to log/bfc#
-	if(xGlobalMqttAgentContext.mqttContext.connectStatus == MQTTConnected) {
-		cJSON *logPacketJSON = cJSON_CreateObject();
-		cJSON_AddStringToObject(logPacketJSON, logLevel, logMsg);
-		char *payload = cJSON_PrintUnformatted(logPacketJSON);
-
-		printf("Payload: %s\n", payload);
-
-		MQTTPublishInfo_t xPublishInfo;
-		/* The context for the completion callback must stay in scope until
-		* the completion callback is invoked. In this case, using a stack variable
-		* is safe because the task waits for the callback to execute before continuing. */
-		MQTTAgentCommandContext_t xCommandContext;
-		MQTTAgentCommandInfo_t xCommandInformation;
-		BaseType_t xReturn;
-		char topic[20] = "log/";
-		strcat(topic, bfc_name);
-
-		memset( (void *) &xPublishInfo, 0x00, sizeof( xPublishInfo ) );
-		xPublishInfo.qos = MQTTQoS0;
-		xPublishInfo.pTopicName = topic;
-		xPublishInfo.topicNameLength = (uint16_t) strlen(topic);
-		xPublishInfo.pPayload = payload;
-		xPublishInfo.payloadLength = strlen(payload);
-
-		memset( (void *) &xCommandContext, 0x00, sizeof( xCommandContext ) );
-		xCommandContext.xTaskToNotify = xTaskGetCurrentTaskHandle();
-		xCommandContext.ulCmdCounter = cmdCounter++;
-
-		xCommandInformation.cmdCompleteCallback = prvPublishCommandCallback;
-		xCommandInformation.pCmdCompleteCallbackContext = &xCommandContext;
-		xCommandInformation.blockTimeMs = MAX_COMMAND_SEND_BLOCK_TIME_MS;
-
-		MQTTStatus_t xCommandAdded = MQTTAgent_Publish(&xGlobalMqttAgentContext, &xPublishInfo, &xCommandInformation );
-
-		if( xCommandAdded == MQTTSuccess ) {
-		  //printf("%s", "MQTT Publish command sent to agent thread successfully\n");
-		  /* The command was successfully sent to the agent.  Note the data
-		  pointed to by xPublishInfo.pTopicName and xPublishInfo.pPayload must
-		  remain valid (not be lost from a stack frame or overwritten in a buffer)
-		  until the PUBLISH is acknowledged. */
-		  xReturn = xTaskNotifyWait( 0, 0, NULL, portMAX_DELAY ); /* Wait indefinitely. */
-
-		  if( xReturn != pdFAIL )
-		  {
-			  /* The message was acknowledged and
-			  xCommandContext.xReturnStatus holds the result of the operation. */
-			  //printf("%s", "MQTT Publish command successfully acknowledged by broker\n");
-		  }
-		} else {
-			printf("%s","Failed to enqueue message for MQTT Agent Publish - Log Message\n");
-		}
-
-		cJSON_Delete(logPacketJSON);
-		cJSON_free(payload);
-	}
-}
-
 /*-----------------------------------------------------------*/
 
 static void prvPublishCommandCallback( MQTTAgentCommandContext_t * pxCommandContext,
@@ -1161,8 +1185,7 @@ void vApplicationIPNetworkEventHook( eIPCallbackEvent_t eNetworkEvent ) {
 static BaseType_t xTasksAlreadyCreated = pdFALSE;
 
     /* Both eNetworkUp and eNetworkDown events can be processed here. */
-    if( eNetworkEvent == eNetworkUp )
-    {
+    if( eNetworkEvent == eNetworkUp ) {
         /* Create the tasks that use the TCP/IP stack if they have not already
         been created. */
         if( xTasksAlreadyCreated == pdFALSE )
@@ -1179,6 +1202,10 @@ static BaseType_t xTasksAlreadyCreated = pdFALSE;
 
             xTasksAlreadyCreated = pdTRUE;
         }
+    } else if (eNetworkEvent == eNetworkDown) {
+    	vTaskDelete(ManageMQTTConnHandle);
+    	vTaskDelete(LoggingHandle);
+    	xTasksAlreadyCreated = pdFALSE;
     }
 }
 
@@ -1206,11 +1233,11 @@ static void prvIncomingPublishCallback( MQTTAgentContext_t * pMqttAgentContext,
 	printf("Incoming Publish: %.*s - %.*s\n",pxPublishInfo->topicNameLength, pxPublishInfo->pTopicName, pxPublishInfo->payloadLength, (char*)pxPublishInfo->pPayload);
 
 	int incomingTopicID = CMD_TOPICERROR;
-	char* topic = pxPublishInfo->pTopicName;
+	const char* topic = pxPublishInfo->pTopicName;
 	// Decode topic string into an ID
 	if (pxPublishInfo->topicNameLength > 6) {
 		if(strncmp(topic, "command/", 8) == 0) {
-			char* substr = topic + 8;
+			const char* substr = topic + 8;
 			if(strncmp(substr, bfc_name, strlen(bfc_name)) == 0) {
 				substr += strlen(bfc_name) + 1;
 				if(strncmp(substr, "bfs", 3) == 0) incomingTopicID = CMD_BFPWR;
@@ -1235,7 +1262,7 @@ static void prvIncomingPublishCallback( MQTTAgentContext_t * pMqttAgentContext,
 			break;
 		case CMD_BFTEST:
 			// bftest has no payload
-			doBFTest();
+			parseBFTest();
 			break;
 		case CMD_DOCPWR:
 			parseDoCPower(data, len);
@@ -1248,7 +1275,7 @@ static void prvIncomingPublishCallback( MQTTAgentContext_t * pMqttAgentContext,
 			xTaskNotify(TelemetryHandle, EVENT_FLAG, eSetValueWithOverwrite);
 			break;
 		case CMD_STATUS:
-			// status has no payload, ignored
+			// status has no payload
 			xTaskNotify(TelemetryHandle, EVENT_FLAG, eSetValueWithOverwrite);
 			break;
 		case CMD_TOPICERROR:
@@ -1260,6 +1287,7 @@ static void prvIncomingPublishCallback( MQTTAgentContext_t * pMqttAgentContext,
 		}
 
 }
+
 /*-----------------------------------------------------------*/
 void parseTime(const uint8_t *data, int len) {
 	RTC_TimeTypeDef rtc_time;
@@ -1288,11 +1316,23 @@ void parseTime(const uint8_t *data, int len) {
 
 			HAL_RTC_SetTime(&hrtc, &rtc_time, RTC_FORMAT_BIN);
 			HAL_RTC_SetDate(&hrtc, &rtc_date, RTC_FORMAT_BIN);
-			printf("Time set %.lu - %04d-%02d-%02d - %02d:%02d:%02d\n", unixTime, rtc_date.Year+2000, rtc_date.Month, rtc_date.Date, rtc_time.Hours, rtc_time.Minutes, rtc_time.Seconds);
+			char message[50];
+			snprintf(message, 50, "Time set %.lu - %04d-%02d-%02d %02d:%02d:%02d", unixTime, rtc_date.Year+2000, rtc_date.Month, rtc_date.Date, rtc_time.Hours, rtc_time.Minutes, rtc_time.Seconds);
+			printf("%s\n", message);
+			sendLog("info", message);
 		}
 	}
 }
 
+/*-----------------------------------------------------------*/
+void parseBFTest() {
+	if (nextPointTime - unixTime > 10) {
+		xTaskNotify(defaultTaskHandle, EVENT_FLAG, eSetValueWithOverwrite);
+	} else {
+		printf("Can't do BF Test, next pointing is too soon\n");
+		sendLog("error", "Can't do BF Test, next pointing is too soon");
+	}
+}
 
 /*-----------------------------------------------------------*/
 
