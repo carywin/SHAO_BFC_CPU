@@ -1,0 +1,12 @@
+../Middlewares/Third_Party/coreSNTP/core_sntp_serializer.c:221:13:fillWordMemoryInNetworkOrder	16	static
+../Middlewares/Third_Party/coreSNTP/core_sntp_serializer.c:241:17:readWordFromNetworkByteOrderMemory	24	static
+../Middlewares/Third_Party/coreSNTP/core_sntp_serializer.c:261:16:absoluteOf	24	static
+../Middlewares/Third_Party/coreSNTP/core_sntp_serializer.c:279:13:isZeroTimestamp	24	static
+../Middlewares/Third_Party/coreSNTP/core_sntp_serializer.c:294:17:fractionsToMs	16	static
+../Middlewares/Third_Party/coreSNTP/core_sntp_serializer.c:316:16:safeTimeDifference	208	static
+../Middlewares/Third_Party/coreSNTP/core_sntp_serializer.c:448:13:calculateClockOffset	64	static
+../Middlewares/Third_Party/coreSNTP/core_sntp_serializer.c:511:21:parseValidSntpResponse	48	static
+../Middlewares/Third_Party/coreSNTP/core_sntp_serializer.c:605:14:Sntp_SerializeRequest	32	static
+../Middlewares/Third_Party/coreSNTP/core_sntp_serializer.c:673:14:Sntp_DeserializeResponse	40	static
+../Middlewares/Third_Party/coreSNTP/core_sntp_serializer.c:748:14:Sntp_CalculatePollInterval	32	static
+../Middlewares/Third_Party/coreSNTP/core_sntp_serializer.c:812:14:Sntp_ConvertToUnixTime	32	static

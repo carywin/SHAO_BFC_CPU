@@ -35,6 +35,7 @@ Middlewares/Third_Party/FreeRTOS-TCP \
 Middlewares/Third_Party/cJSON \
 Middlewares/Third_Party/coreMQTT \
 Middlewares/Third_Party/coreMQTT-Agent \
+Middlewares/Third_Party/coreSNTP \
 USB_DEVICE/App \
 USB_DEVICE/Target \
 

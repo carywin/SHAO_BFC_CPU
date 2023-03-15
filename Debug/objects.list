@@ -95,6 +95,8 @@
 "./Middlewares/Third_Party/coreMQTT-Agent/core_mqtt_agent_command_functions.o"
 "./Middlewares/Third_Party/coreMQTT-Agent/freertos_agent_message.o"
 "./Middlewares/Third_Party/coreMQTT-Agent/freertos_command_pool.o"
+"./Middlewares/Third_Party/coreSNTP/core_sntp_client.o"
+"./Middlewares/Third_Party/coreSNTP/core_sntp_serializer.o"
 "./USB_DEVICE/App/usb_device.o"
 "./USB_DEVICE/App/usbd_desc.o"
 "./USB_DEVICE/App/usbd_dfu_if.o"

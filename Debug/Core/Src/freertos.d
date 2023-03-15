@@ -82,6 +82,7 @@ Core/Src/freertos.o: ../Core/Src/freertos.c \
  ../Middlewares/Third_Party/FreeRTOS-TCP/include/FreeRTOS_DNS_Globals.h \
  ../Middlewares/Third_Party/FreeRTOS-TCP/include/FreeRTOS_DNS_Callback.h \
  ../Middlewares/Third_Party/FreeRTOS-TCP/include/FreeRTOS_DNS_Cache.h \
+ ../Middlewares/Third_Party/FreeRTOS-TCP/include/FreeRTOS_UDP_IP.h \
  ../Middlewares/Third_Party/FreeRTOS-TCP/include/FreeRTOS_Sockets.h \
  ../Middlewares/Third_Party/coreMQTT/include/core_mqtt.h \
  ../Middlewares/Third_Party/coreMQTT/include/core_mqtt_serializer.h \
@@ -96,6 +97,10 @@ Core/Src/freertos.o: ../Core/Src/freertos.c \
  ../Middlewares/Third_Party/coreMQTT-Agent/include/core_mqtt_agent.h \
  ../Middlewares/Third_Party/cJSON/cJSON.h ../Core/Inc/i2c.h \
  ../Core/Inc/bfc_config.h ../Core/Inc/rtc.h ../Core/Inc/iwdg.h \
+ ../Middlewares/Third_Party/coreSNTP/include/core_sntp_client.h \
+ ../Middlewares/Third_Party/coreSNTP/include/core_sntp_serializer.h \
+ ../Middlewares/Third_Party/coreMQTT/include/tcp_sockets_wrapper.h \
+ ../Core/Inc/tim.h \
  ../Middlewares/Third_Party/coreMQTT-Agent/include/freertos_agent_message.h \
  ../Middlewares/Third_Party/coreMQTT-Agent/include/freertos_command_pool.h \
  ../Middlewares/Third_Party/coreMQTT/include/backoff_algorithm.h \
@@ -189,6 +194,7 @@ Core/Src/freertos.o: ../Core/Src/freertos.c \
 ../Middlewares/Third_Party/FreeRTOS-TCP/include/FreeRTOS_DNS_Globals.h:
 ../Middlewares/Third_Party/FreeRTOS-TCP/include/FreeRTOS_DNS_Callback.h:
 ../Middlewares/Third_Party/FreeRTOS-TCP/include/FreeRTOS_DNS_Cache.h:
+../Middlewares/Third_Party/FreeRTOS-TCP/include/FreeRTOS_UDP_IP.h:
 ../Middlewares/Third_Party/FreeRTOS-TCP/include/FreeRTOS_Sockets.h:
 ../Middlewares/Third_Party/coreMQTT/include/core_mqtt.h:
 ../Middlewares/Third_Party/coreMQTT/include/core_mqtt_serializer.h:
@@ -206,6 +212,10 @@ Core/Src/freertos.o: ../Core/Src/freertos.c \
 ../Core/Inc/bfc_config.h:
 ../Core/Inc/rtc.h:
 ../Core/Inc/iwdg.h:
+../Middlewares/Third_Party/coreSNTP/include/core_sntp_client.h:
+../Middlewares/Third_Party/coreSNTP/include/core_sntp_serializer.h:
+../Middlewares/Third_Party/coreMQTT/include/tcp_sockets_wrapper.h:
+../Core/Inc/tim.h:
 ../Middlewares/Third_Party/coreMQTT-Agent/include/freertos_agent_message.h:
 ../Middlewares/Third_Party/coreMQTT-Agent/include/freertos_command_pool.h:
 ../Middlewares/Third_Party/coreMQTT/include/backoff_algorithm.h:

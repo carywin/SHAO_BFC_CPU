@@ -11,6 +11,7 @@ RM := rm -rf
 -include sources.mk
 -include USB_DEVICE/Target/subdir.mk
 -include USB_DEVICE/App/subdir.mk
+-include Middlewares/Third_Party/coreSNTP/subdir.mk
 -include Middlewares/Third_Party/coreMQTT-Agent/subdir.mk
 -include Middlewares/Third_Party/coreMQTT/subdir.mk
 -include Middlewares/Third_Party/cJSON/subdir.mk

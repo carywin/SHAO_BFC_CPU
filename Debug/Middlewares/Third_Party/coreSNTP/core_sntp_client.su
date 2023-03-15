@@ -1,0 +1,12 @@
+../Middlewares/Third_Party/coreSNTP/core_sntp_client.c:47:14:Sntp_Init	32	static
+../Middlewares/Third_Party/coreSNTP/core_sntp_client.c:150:17:calculateElapsedTimeMs	144	static
+../Middlewares/Third_Party/coreSNTP/core_sntp_client.c:202:21:validateContext	24	static
+../Middlewares/Third_Party/coreSNTP/core_sntp_client.c:288:21:sendSntpPacket	88	static
+../Middlewares/Third_Party/coreSNTP/core_sntp_client.c:386:21:addClientAuthentication	40	static
+../Middlewares/Third_Party/coreSNTP/core_sntp_client.c:431:14:Sntp_SendTimeRequest	64	static
+../Middlewares/Third_Party/coreSNTP/core_sntp_client.c:527:13:rotateServerForNextTimeQuery	24	static
+../Middlewares/Third_Party/coreSNTP/core_sntp_client.c:564:21:receiveSntpResponse	48	static
+../Middlewares/Third_Party/coreSNTP/core_sntp_client.c:633:21:processServerResponse	64	static
+../Middlewares/Third_Party/coreSNTP/core_sntp_client.c:764:13:decideAboutReadRetry	72	static
+../Middlewares/Third_Party/coreSNTP/core_sntp_client.c:819:14:Sntp_ReceiveTimeResponse	64	static
+../Middlewares/Third_Party/coreSNTP/core_sntp_client.c:895:14:Sntp_StatusToStr	24	static

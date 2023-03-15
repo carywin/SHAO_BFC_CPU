@@ -32,6 +32,7 @@
 
 /* FreeRTOS+TCP includes. */
 #include "FreeRTOS_IP.h"
+#include "FreeRTOS_UDP_IP.h"
 #include "FreeRTOS_Sockets.h"
 
 /* MQTT library includes. */
@@ -46,8 +47,10 @@
 #include "bfc_config.h"
 #include "rtc.h"
 #include <stdio.h>
-#include "time.h"
+#include <time.h>
 #include "iwdg.h"
+#include "core_sntp_client.h"
+#include "tim.h"
 
 /*********************** coreMQTT Agent Configurations **********************/
 /**
@@ -119,6 +122,10 @@ struct NetworkContext
 
 #define MQTT_BROKER_ENDPOINT "10.128.0.1"
 #define MQTT_BROKER_PORT 1883
+
+#define SNTP_SERVER "10.128.0.1"
+#define SNTP_RESPONSE_TIMEOUT_MS 5000
+#define SNTP_BUFFER_SIZE 400
 
 /**
  * @brief This app uses task notifications to signal tasks from MQTT callback
@@ -290,7 +297,7 @@ osThreadId_t ManageMQTTConnHandle;
 const osThreadAttr_t ManageMQTTConn_attributes = {
   .name = "ManageMQTTConn",
   .stack_size = 1024 * 4,
-  .priority = (osPriority_t) osPriorityNormal,
+  .priority = (osPriority_t) osPriorityAboveNormal,
 };
 /* Definitions for PingWatchdog */
 osThreadId_t PingWatchdogHandle;
@@ -341,6 +348,7 @@ float readTempSensor();
 void sendPointingResult();
 void sendLog(const char *logLevel, const char *logMsg);
 void parseBFTest();
+uint32_t uxRand();
 
 /*-----------------------------------------------------------*/
 
@@ -455,6 +463,98 @@ static void prvPublishCommandCallback( MQTTAgentCommandContext_t * pxCommandCont
  */
 static uint32_t prvGetTimeMs( void );
 
+/**
+ * @brief The demo implementation of the @ref SntpResolveDns_t interface to
+ * allow the coreSNTP library to resolve DNS name of a time server being
+ * used for requesting time from.
+ *
+ * @param[in] pTimeServer The time-server whose IPv4 address is to be resolved.
+ * @param[out] pIpV4Addr This is filled with the resolved IPv4 address of
+ * @p pTimeServer.
+ */
+static BaseType_t resolveDns( const SntpServerInfo_t * pServerAddr,
+                        uint32_t * pIpV4Addr );
+
+/**
+ * @brief The demo implementation of the @ref SntpGetTime_t interface
+ * for obtaining system clock time for the coreSNTP library.
+ *
+ * @param[out] pTime This will be populated with the current time from
+ * the system.
+ */
+static void sntpClient_GetTime( SntpTimestamp_t * pCurrentTime );
+
+/**
+ *
+ * @param[in] pTimeServer The time server from whom the time has been received.
+ * @param[in] pServerTime The most recent time of the server, @p pTimeServer, sent in its
+ * time response.
+ * @param[in] clockOffsetMs The value, in milliseconds, of system clock offset relative
+ * to the server time calculated by the coreSNTP library. If the value is positive, then
+ * the system is BEHIND the server time, and a "slew" clock correction approach is used in
+ * this demo. If the value is negative, then the system time is AHEAD of the server time,
+ * and a "step" clock correction approach is used in this demo.
+ * @param[in] leapSecondInfo This indicates whether there is an upcoming leap second insertion
+ * or deletion (according to astronomical time) the last minute of the end of the month that the
+ * system time needs to adjust for. Leap second adjustment is valuable for applications that
+ * require non-abrupt increment of time for use cases like logging. This demo DOES NOT showcase
+ * leap second adjustment in system clock.
+ */
+static void sntpClient_SetTime( const SntpServerInfo_t * pTimeServer,
+                                const SntpTimestamp_t * pServerTime,
+                                int64_t clockOffsetMs,
+                                SntpLeapSecondInfo_t leapSecondInfo );
+
+/**
+ * @brief The demo implementation of the @ref UdpTransportSendTo_t function
+ * of the UDP transport interface to allow the coreSNTP library to perform
+ * network operation of sending time request over UDP to the provided time server.
+ *
+ * @param[in] pNetworkContext This will be the NetworkContext_t context object
+ * representing the FreeRTOS UDP socket to use for network send operation.
+ * @param[in] serverAddr The IPv4 address of the time server.
+ * @param[in] serverPort The port of the server to send data to.
+ * @param[in] pBuffer The demo-supplied network buffer of size, SNTP_CONTEXT_NETWORK_BUFFER_SIZE,
+ * containing the data to send over the network.
+ * @param[in] bytesToSend The size of data in @p pBuffer to send.
+ *
+ * @return Returns the return code of FreeRTOS UDP send API, FreeRTOS_sendto, which returns
+ * 0 for error or timeout OR the number of bytes sent over the network.
+ */
+static int32_t UdpTransport_Send( sntpNetworkContext_t * pNetworkContext,
+                                  uint32_t serverAddr,
+                                  uint16_t serverPort,
+                                  const void * pBuffer,
+                                  uint16_t bytesToSend );
+
+/**
+ * @brief The demo implementation of the @ref UdpTransportRecvFrom_t function
+ * of the UDP transport interface to allow the coreSNTP library to perform
+ * network operation of reading expected time response over UDP from
+ * provided time server.
+ *
+ * @param[in] pNetworkContext This will be the NetworkContext_t context object
+ * representing the FreeRTOS UDP socket to use for network read operation.
+ * @param[in] pTimeServer The IPv4 address of the time server to receive data from.
+ * @param[in] serverPort The port of the server to receive data from.
+ * @param[out] pBuffer The demo-supplied network buffer of size, SNTP_CONTEXT_NETWORK_BUFFER_SIZE,
+ * that will be filled with data received from the network.
+ * @param[in] bytesToRecv The expected number of bytes to receive from the network
+ * for the server response server.
+ *
+ * @return Returns one of the following:
+ * - 0 for timeout in receiving any data from the network (by translating the
+ * -pdFREERTOS_ERRNO_EWOULDBLOCK return code from FreeRTOS_recvfrom API )
+ *                         OR
+ * - The number of bytes read from the network.
+ */
+static int32_t UdpTransport_Recv( sntpNetworkContext_t * pNetworkContext,
+                                  uint32_t serverAddr,
+                                  uint16_t serverPort,
+                                  void * pBuffer,
+                                  uint16_t bytesToRecv );
+
+
 /* USER CODE END FunctionPrototypes */
 
 void StartDefaultTask(void *argument);
@@ -514,9 +614,6 @@ void MX_FREERTOS_Init(void) {
 
   /* creation of ManageMQTTConn */
   //ManageMQTTConnHandle = osThreadNew(StartMQTTConn, NULL, &ManageMQTTConn_attributes);
-
-  /* creation of PingWatchdog */
-  PingWatchdogHandle = osThreadNew(StartPingWD, NULL, &PingWatchdog_attributes);
 
   /* creation of Telemetry */
   TelemetryHandle = osThreadNew(StartTelemetry, NULL, &Telemetry_attributes);
@@ -737,13 +834,70 @@ void StartMQTTConn(void *argument)
 * @retval None
 */
 /* USER CODE END Header_StartPingWD */
-void StartPingWD(void *argument)
-{
+void StartPingWD(void *argument) {
   /* USER CODE BEGIN StartPingWD */
+	static SntpContext_t context;
+	static uint8_t contextBuffer[ SNTP_BUFFER_SIZE ];
+	static sntpNetworkContext_t udpContext;
+	UdpTransportInterface_t udpTransportIntf;
+	static SntpServerInfo_t pTimeServer;
+
+    /* Set the UDP transport interface object. */
+    udpTransportIntf.pUserContext = &udpContext;
+    udpTransportIntf.sendTo = UdpTransport_Send;
+    udpTransportIntf.recvFrom = UdpTransport_Recv;
+
+    // Initialise time server
+    pTimeServer.pServerName = SNTP_SERVER;
+    pTimeServer.serverNameLen = strlen(SNTP_SERVER);
+    pTimeServer.port = SNTP_DEFAULT_SERVER_PORT;
+
+    /* Initialize context. */
+	Sntp_Init( &context,
+			   &pTimeServer,
+			   1,
+			   SNTP_RESPONSE_TIMEOUT_MS,
+			   contextBuffer,
+			   SNTP_BUFFER_SIZE,
+			   resolveDns,
+			   sntpClient_GetTime,
+			   sntpClient_SetTime,
+			   &udpTransportIntf,
+			   NULL );
+
+
   /* Infinite loop */
-  for(;;)
-  {
-    osDelay(103);
+  for(;;) {
+
+	struct freertos_sockaddr bindAddress;
+	SntpStatus_t status;
+
+	// Random time delay to avoid spamming the server on startup
+	osDelay(3000 + uxRand() % 2048);
+
+    udpContext.socket = FreeRTOS_socket( FREERTOS_AF_INET, FREERTOS_SOCK_DGRAM, FREERTOS_IPPROTO_UDP );
+    if (udpContext.socket != FREERTOS_INVALID_SOCKET) {
+    	/* Use a random UDP port for SNTP communication with server */
+		uint16_t randomPort = ( uxRand() % UINT16_MAX );
+		bindAddress.sin_port = FreeRTOS_htons( randomPort );
+		if( FreeRTOS_bind( udpContext.socket, &bindAddress, sizeof( bindAddress ) ) == 0 ) {
+			status = Sntp_SendTimeRequest( &context, uxRand(), 60 );
+			if (status == SntpSuccess) {
+				do {
+					status = Sntp_ReceiveTimeResponse( &context, 200 );
+					osThreadYield();
+				} while (status == SntpNoResponseReceived);
+			}
+			FreeRTOS_shutdown( udpContext.socket, FREERTOS_SHUT_RDWR );
+			FreeRTOS_closesocket( udpContext.socket );
+			if (status == SntpRejectedResponse) {
+				osDelay(3000 + uxRand() % 2048);
+			} else {
+				osDelay(50000 + uxRand() % 4096);
+			}
+		}
+    }
+    osDelay(10000);
   }
   /* USER CODE END StartPingWD */
 }
@@ -755,8 +909,7 @@ void StartPingWD(void *argument)
 * @retval None
 */
 /* USER CODE END Header_StartTelemetry */
-void StartTelemetry(void *argument)
-{
+void StartTelemetry(void *argument) {
   /* USER CODE BEGIN StartTelemetry */
 	BaseType_t xReturn;
 	int i;
@@ -815,7 +968,7 @@ void StartTelemetry(void *argument)
 		  payload = cJSON_PrintUnformatted(telemetryPacketJSON);
 		  configASSERT(payload != NULL);
 
-		  printf("Telemetry payload: %s\n", payload);
+		  //printf("Telemetry payload: %s\n", payload);
 
 		  MQTTPublishInfo_t xPublishInfo;
 		  /* The context for the completion callback must stay in scope until
@@ -1200,11 +1353,15 @@ static BaseType_t xTasksAlreadyCreated = pdFALSE;
         	// Start logging thread
         	LoggingHandle = osThreadNew(StartLogging, NULL, &Logging_attributes);
 
+        	/* creation of PingWatchdog */
+        	PingWatchdogHandle = osThreadNew(StartPingWD, NULL, &PingWatchdog_attributes);
+
             xTasksAlreadyCreated = pdTRUE;
         }
     } else if (eNetworkEvent == eNetworkDown) {
     	vTaskDelete(ManageMQTTConnHandle);
     	vTaskDelete(LoggingHandle);
+    	vTaskDelete(PingWatchdogHandle);
     	xTasksAlreadyCreated = pdFALSE;
     }
 }
@@ -1678,6 +1835,156 @@ static uint32_t prvGetTimeMs( void )
 }
 
 /*-----------------------------------------------------------*/
+
+/********************** DNS Resolution Interface *******************************/
+static BaseType_t resolveDns( const SntpServerInfo_t * pServerAddr,
+                        uint32_t * pIpV4Addr )
+{
+    uint32_t resolvedAddr = 0;
+    BaseType_t status = 0;
+
+    resolvedAddr = FreeRTOS_gethostbyname( pServerAddr->pServerName );
+
+    /* Set the output parameter if DNS look up succeeded. */
+    if( resolvedAddr != 0 )
+    {
+        /* DNS Look up succeeded. */
+        status = 1;
+
+        *pIpV4Addr = FreeRTOS_ntohl( resolvedAddr );
+
+        #if defined( LIBRARY_LOG_LEVEL ) && ( LIBRARY_LOG_LEVEL != LOG_NONE )
+            uint8_t stringAddr[ 16 ];
+            FreeRTOS_inet_ntoa( resolvedAddr, stringAddr );
+            LogInfo( ( "Resolved time server as %s", stringAddr ) );
+        #endif
+    }
+
+    return status;
+}
+
+/**************************** Time Interfaces ************************************************/
+static void sntpClient_GetTime( SntpTimestamp_t * pCurrentTime ) {
+    pCurrentTime->seconds = unixTime + SNTP_TIME_AT_UNIX_EPOCH_SECS;
+    pCurrentTime->fractions = 0;
+}
+
+static void sntpClient_SetTime( const SntpServerInfo_t * pTimeServer,
+                                const SntpTimestamp_t * pServerTime,
+                                int64_t clockOffsetMs,
+                                SntpLeapSecondInfo_t leapSecondInfo ) {
+
+    //printf("Received time from time server: %s\n", pTimeServer->pServerName);
+
+    SntpStatus_t status;
+    uint32_t unixSecs;
+    uint32_t unixMicroSecs;
+
+    /* Convert server time from NTP timestamp to UNIX format. */
+    status = Sntp_ConvertToUnixTime( pServerTime,
+                                     &unixSecs,
+                                     &unixMicroSecs );
+    if ( status == SntpSuccess ) {
+    	unixTime = unixSecs;
+    	uint32_t tim2Counter = 84000000 - (unixMicroSecs * 84);
+    	htim2.Instance->CNT = tim2Counter;
+		//printf("SNTP: Time set to %.lu s, TIM2: %.lu\n", unixTime, tim2Counter);
+
+    }
+
+}
+
+/********************** UDP Interface definition *******************************/
+int32_t UdpTransport_Send( sntpNetworkContext_t * pNetworkContext,
+                           uint32_t serverAddr,
+                           uint16_t serverPort,
+                           const void * pBuffer,
+                           uint16_t bytesToSend )
+{
+    struct freertos_sockaddr destinationAddress;
+    int32_t bytesSent;
+
+    destinationAddress.sin_addr = FreeRTOS_htonl( serverAddr );
+    destinationAddress.sin_port = FreeRTOS_htons( serverPort );
+
+    /* Send the buffer with ulFlags set to 0, so the FREERTOS_ZERO_COPY bit
+     * is clear. */
+    bytesSent = FreeRTOS_sendto( /* The socket being send to. */
+        pNetworkContext->socket,
+        /* The data being sent. */
+        pBuffer,
+        /* The length of the data being sent. */
+        bytesToSend,
+        /* ulFlags with the FREERTOS_ZERO_COPY bit clear. */
+        0,
+        /* Where the data is being sent. */
+        &destinationAddress,
+        /* Not used but should be set as shown. */
+        sizeof( destinationAddress )
+        );
+
+    return bytesSent;
+}
+
+static int32_t UdpTransport_Recv( sntpNetworkContext_t * pNetworkContext,
+                                  uint32_t serverAddr,
+                                  uint16_t serverPort,
+                                  void * pBuffer,
+                                  uint16_t bytesToRecv )
+{
+    struct freertos_sockaddr sourceAddress;
+    int32_t bytesReceived;
+    socklen_t addressLength = sizeof( struct freertos_sockaddr );
+
+    /* Receive into the buffer with ulFlags set to 0, so the FREERTOS_ZERO_COPY bit
+     * is clear. */
+    bytesReceived = FreeRTOS_recvfrom( /* The socket data is being received on. */
+        pNetworkContext->socket,
+
+        /* The buffer into which received data will be
+         * copied. */
+        pBuffer,
+
+        /* The length of the buffer into which data will be
+         * copied. */
+        bytesToRecv,
+        /* ulFlags with the FREERTOS_ZERO_COPY bit clear. */
+        0,
+        /* Will get set to the source of the received data. */
+        &sourceAddress,
+        /* Not used but should be set as shown. */
+        &addressLength
+        );
+
+    /* If data is received from the network, discard the data if  received from a different source than
+     * the server. */
+    if( ( bytesReceived > 0 ) && ( ( FreeRTOS_ntohl( sourceAddress.sin_addr ) != serverAddr ) ||
+                                   ( FreeRTOS_ntohs( sourceAddress.sin_port ) != serverPort ) ) )
+    {
+        bytesReceived = 0;
+
+        #if defined( LIBRARY_LOG_LEVEL ) && ( LIBRARY_LOG_LEVEL != LOG_NONE )
+            /* Convert the IP address of the sender's address to string for logging. */
+            char stringAddr[ 16 ];
+            FreeRTOS_inet_ntoa( sourceAddress.sin_addr, stringAddr );
+
+            /* Log about reception of packet from unexpected sender. */
+            LogWarn( ( "Received UDP packet from unexpected source: Addr=%s Port=%u",
+                       stringAddr, FreeRTOS_ntohs( sourceAddress.sin_port ) ) );
+        #endif
+    }
+
+    /* Translate the return code of timeout to the UDP transport interface expected
+     * code to indicate read retry. */
+    else if( bytesReceived == -pdFREERTOS_ERRNO_EWOULDBLOCK )
+    {
+        bytesReceived = 0;
+    }
+
+    return bytesReceived;
+}
+
+
 
 /* USER CODE END Application */
 
