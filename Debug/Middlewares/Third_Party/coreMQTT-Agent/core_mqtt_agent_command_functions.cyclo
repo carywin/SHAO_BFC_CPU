@@ -1,0 +1,8 @@
+core_mqtt_agent_command_functions.c:44:14:MQTTAgentCommand_ProcessLoop	1
+core_mqtt_agent_command_functions.c:60:14:MQTTAgentCommand_Publish	4
+core_mqtt_agent_command_functions.c:91:14:MQTTAgentCommand_Subscribe	1
+core_mqtt_agent_command_functions.c:119:14:MQTTAgentCommand_Unsubscribe	1
+core_mqtt_agent_command_functions.c:147:14:MQTTAgentCommand_Connect	2
+core_mqtt_agent_command_functions.c:181:14:MQTTAgentCommand_Disconnect	1
+core_mqtt_agent_command_functions.c:202:14:MQTTAgentCommand_Ping	1
+core_mqtt_agent_command_functions.c:224:14:MQTTAgentCommand_Terminate	1

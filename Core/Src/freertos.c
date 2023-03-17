@@ -126,6 +126,7 @@ struct NetworkContext
 #define SNTP_SERVER "10.128.0.1"
 #define SNTP_RESPONSE_TIMEOUT_MS 5000
 #define SNTP_BUFFER_SIZE 400
+#define SNTP_POLL_INTERVAL 300000 //ms (5 min)
 
 /**
  * @brief This app uses task notifications to signal tasks from MQTT callback
@@ -253,14 +254,12 @@ uint8_t taskMonitor = 0; // Flags set by each task to indicate they are running
 #define taskflag_Telemetry 0x02
 #define taskflag_Logging 0x04
 
-/* The MAC address array is not declared const as the MAC address will
-normally be read from an EEPROM and not hard coded (in real deployed
-applications).*/
+/* The MAC address array is initialised to silly values which get over-written during startup
+ * when the UID of the chip is read.*/
 static uint8_t ucMACAddress[ 6 ] = { 0x00, 0x11, 0x22, 0x33, 0x44, 0x55 };
 
-/* Define the network addressing.  These parameters will be used if either
-ipconfigUDE_DHCP is 0 or if ipconfigUSE_DHCP is 1 but DHCP auto configuration
-failed. */
+/* Define the default network addressing.  Since DHCP isn't used, the BFC will use its UID to
+ * compute a psueod-random 4th byte and hope for no clashes.*/
 static uint8_t ucIPAddress[ 4 ] = { 10, 128, 60, 1 };
 static const uint8_t ucNetMask[ 4 ] = { 255, 255, 0, 0 };
 static const uint8_t ucGatewayAddress[ 4 ] = { 10, 128, 0, 1 };
@@ -506,7 +505,7 @@ static void sntpClient_SetTime( const SntpServerInfo_t * pTimeServer,
                                 SntpLeapSecondInfo_t leapSecondInfo );
 
 /**
- * @brief The demo implementation of the @ref UdpTransportSendTo_t function
+ * @brief An implementation of the @ref UdpTransportSendTo_t function
  * of the UDP transport interface to allow the coreSNTP library to perform
  * network operation of sending time request over UDP to the provided time server.
  *
@@ -528,7 +527,7 @@ static int32_t UdpTransport_Send( sntpNetworkContext_t * pNetworkContext,
                                   uint16_t bytesToSend );
 
 /**
- * @brief The demo implementation of the @ref UdpTransportRecvFrom_t function
+ * @brief An implementation of the @ref UdpTransportRecvFrom_t function
  * of the UDP transport interface to allow the coreSNTP library to perform
  * network operation of reading expected time response over UDP from
  * provided time server.
@@ -617,6 +616,8 @@ void MX_FREERTOS_Init(void) {
 
   /* creation of Telemetry */
   TelemetryHandle = osThreadNew(StartTelemetry, NULL, &Telemetry_attributes);
+
+  // Most tasks are started in the network status callback when the network is up.
 
   /* USER CODE BEGIN RTOS_THREADS */
 
@@ -718,7 +719,7 @@ BaseType_t xReturn;
 	//	  doBFTest();
 	  }
 	  if (unixTime >= nextPointTime) {
-		  printf("%.lu: Time to send next pointing\n",unixTime);
+		  //printf("%.lu: Time to send next pointing\n",unixTime);
 		  sendBFPointing();
 		  nextPointTime = LONG_TIME_AWAY;
 		  for (int i=0; i<=7; i++) {
@@ -869,19 +870,17 @@ void StartPingWD(void *argument) {
   /* Infinite loop */
   for(;;) {
 
-	struct freertos_sockaddr bindAddress;
-	SntpStatus_t status;
-
 	// Random time delay to avoid spamming the server on startup
-	osDelay(3000 + uxRand() % 2048);
+	osDelay(100 + uxRand() % 1024);
 
     udpContext.socket = FreeRTOS_socket( FREERTOS_AF_INET, FREERTOS_SOCK_DGRAM, FREERTOS_IPPROTO_UDP );
     if (udpContext.socket != FREERTOS_INVALID_SOCKET) {
     	/* Use a random UDP port for SNTP communication with server */
+    	struct freertos_sockaddr bindAddress;
 		uint16_t randomPort = ( uxRand() % UINT16_MAX );
 		bindAddress.sin_port = FreeRTOS_htons( randomPort );
 		if( FreeRTOS_bind( udpContext.socket, &bindAddress, sizeof( bindAddress ) ) == 0 ) {
-			status = Sntp_SendTimeRequest( &context, uxRand(), 60 );
+			SntpStatus_t status = Sntp_SendTimeRequest( &context, uxRand(), 60 );
 			if (status == SntpSuccess) {
 				do {
 					status = Sntp_ReceiveTimeResponse( &context, 200 );
@@ -893,11 +892,10 @@ void StartPingWD(void *argument) {
 			if (status == SntpRejectedResponse) {
 				osDelay(3000 + uxRand() % 2048);
 			} else {
-				osDelay(50000 + uxRand() % 4096);
+				osDelay(SNTP_POLL_INTERVAL + uxRand() % 4096);
 			}
 		}
     }
-    osDelay(10000);
   }
   /* USER CODE END StartPingWD */
 }
@@ -913,7 +911,7 @@ void StartTelemetry(void *argument) {
   /* USER CODE BEGIN StartTelemetry */
 	BaseType_t xReturn;
 	int i;
-	osDelay(12000); // short delay to let services connect
+	osDelay(12000 + uxRand() % 2048); // short delay to let services connect
 
   /* Infinite loop */
   for(;;)
@@ -1044,7 +1042,7 @@ void StartLogging(void *argument) {
 				cJSON_AddStringToObject(logPacketJSON, logBuffer[logTail].logLevel, logBuffer[logTail].logMessage);
 				char *payload = cJSON_PrintUnformatted(logPacketJSON);
 
-				printf("Payload: %s\n", payload);
+				//printf("Payload: %s\n", payload);
 
 				MQTTPublishInfo_t xPublishInfo;
 				/* The context for the completion callback must stay in scope until
@@ -1089,7 +1087,7 @@ void StartLogging(void *argument) {
 					  if (++logTail > LOGBUFFSIZE) logTail = 0;
 				  }
 				} else {
-					printf("%s","Failed to enqueue message for MQTT Agent Publish - Log Message\n");
+					//printf("%s","Failed to enqueue message for MQTT Agent Publish - Log Message\n");
 				}
 
 				cJSON_Delete(logPacketJSON);
@@ -1102,6 +1100,9 @@ void StartLogging(void *argument) {
 	}
 }
 
+/* Private application code --------------------------------------------------*/
+/* USER CODE BEGIN Application */
+
 void sendLog(const char *logLevel, const char *logMsg) {
 
 	strncpy(logBuffer[logTail].logLevel, logLevel, 6);
@@ -1109,9 +1110,6 @@ void sendLog(const char *logLevel, const char *logMsg) {
 	if (++logHead > LOGBUFFSIZE) logHead = 0;
 	printf("%s: %s\n", logLevel, logMsg);
 }
-
-/* Private application code --------------------------------------------------*/
-/* USER CODE BEGIN Application */
 
 int checkPowerAlarm() {
 	return HAL_GPIO_ReadPin(PRAlarm_GPIO_Port, PRAlarm_Pin);
@@ -1132,8 +1130,7 @@ void readI2Csensor(int sensorNum, float* bf_volts, int* bf_amps, int* bf_fault)
 			// I2C error
 			printf("I2C Timeout Error waiting for Addr Transmit: %d\n", (int)HAL_I2C_GetError(&hi2c1));
 			I2C_Reset(&hi2c1);
-		}
-		else {
+		} else {
 			result = HAL_I2C_Master_Seq_Receive_IT(&hi2c1, sensorAddr[sensorNum], (uint8_t*) sData, 6, I2C_LAST_FRAME);
 			if (result == HAL_OK) {
 				// wait for receive to finish, signalled by flag from callback function
@@ -1142,8 +1139,7 @@ void readI2Csensor(int sensorNum, float* bf_volts, int* bf_amps, int* bf_fault)
 					// I2C error
 					printf("I2C Timeout Error waiting for Data Receive: %d\n", (int)HAL_I2C_GetError(&hi2c1));
 					I2C_Reset(&hi2c1);
-				}
-				else {
+				} else {
 					// Successful read of 6 bytes of I2C sensor data - process into V & I
 					uint16_t amps_int = ((uint16_t)sData[0] << 4) + ((sData[1] & 0xF0) >> 4);
 					*bf_amps = (int) amps_int;
@@ -1152,15 +1148,13 @@ void readI2Csensor(int sensorNum, float* bf_volts, int* bf_amps, int* bf_fault)
 					uint16_t adc_int = (sData[4] << 4) + ((sData[5] & 0xF0) >> 4);
 					if (volts_int > 1640 && adc_int > 810) *bf_fault = 0; else *bf_fault = 1;
 				}
-			}
-			else {
+			} else {
 				// Error on I2C receive
 				printf("I2C HAL Error Receiving Data: %d\n", result);
 				I2C_Reset(&hi2c1);
 			}
 		}
-	}
-	else {
+	} else {
 		// Error on I2C transmit
 		printf("I2C HAL Error Sending Register Addr: %d\n", result);
 		I2C_Reset(&hi2c1);
@@ -1261,7 +1255,7 @@ void sendPointingResult() {
 		char *payload = NULL;
 		payload = cJSON_PrintUnformatted(resultPacketJSON);
 
-		printf("Payload: %s\n", payload);
+		//printf("Payload: %s\n", payload);
 
 		MQTTPublishInfo_t xPublishInfo;
 		/* The context for the completion callback must stay in scope until
@@ -1306,7 +1300,7 @@ void sendPointingResult() {
 			  //printf("%s", "MQTT Publish command successfully acknowledged by broker\n");
 		  }
 		} else {
-			printf("%s","Failed to enqueue message for MQTT Agent Publish - Pointing Result\n");
+			//printf("%s","Failed to enqueue message for MQTT Agent Publish - Pointing Result\n");
 		}
 
 		cJSON_Delete(resultPacketJSON);
@@ -1391,10 +1385,11 @@ static void prvIncomingPublishCallback( MQTTAgentContext_t * pMqttAgentContext,
 
 	int incomingTopicID = CMD_TOPICERROR;
 	const char* topic = pxPublishInfo->pTopicName;
+	const char* substr = topic;
 	// Decode topic string into an ID
 	if (pxPublishInfo->topicNameLength > 6) {
 		if(strncmp(topic, "command/", 8) == 0) {
-			const char* substr = topic + 8;
+			substr = topic + 8;
 			if(strncmp(substr, bfc_name, strlen(bfc_name)) == 0) {
 				substr += strlen(bfc_name) + 1;
 				if(strncmp(substr, "bfs", 3) == 0) incomingTopicID = CMD_BFPWR;
@@ -1408,10 +1403,11 @@ static void prvIncomingPublishCallback( MQTTAgentContext_t * pMqttAgentContext,
 		} else incomingTopicID = CMD_TOPICERROR;
 	}
 
-	printf("Command Decoded to: %d\n", incomingTopicID);
+	//printf("Command Decoded to: %d\n", incomingTopicID);
 
 	uint8_t* data = (uint8_t*)pxPublishInfo->pPayload;
 	int len = (int)pxPublishInfo->payloadLength;
+	char errmsg[20];
 
 	switch(incomingTopicID) {
 		case CMD_POINT:
@@ -1437,6 +1433,8 @@ static void prvIncomingPublishCallback( MQTTAgentContext_t * pMqttAgentContext,
 			break;
 		case CMD_TOPICERROR:
 			// Ignore the payload for invalid topics
+			snprintf(errmsg, 20, "unknown command: %s", substr);
+			sendLog("error",errmsg);
 			break;
 		case CMD_SETTIME:
 			parseTime(data, len);
@@ -1475,8 +1473,10 @@ void parseTime(const uint8_t *data, int len) {
 			HAL_RTC_SetDate(&hrtc, &rtc_date, RTC_FORMAT_BIN);
 			char message[50];
 			snprintf(message, 50, "Time set %.lu - %04d-%02d-%02d %02d:%02d:%02d", unixTime, rtc_date.Year+2000, rtc_date.Month, rtc_date.Date, rtc_time.Hours, rtc_time.Minutes, rtc_time.Seconds);
-			printf("%s\n", message);
+			//printf("%s\n", message);
 			sendLog("info", message);
+		} else {
+			sendLog("error","error parsing time payload");
 		}
 	}
 }
@@ -1486,7 +1486,7 @@ void parseBFTest() {
 	if (nextPointTime - unixTime > 10) {
 		xTaskNotify(defaultTaskHandle, EVENT_FLAG, eSetValueWithOverwrite);
 	} else {
-		printf("Can't do BF Test, next pointing is too soon\n");
+		//printf("Can't do BF Test, next pointing is too soon\n");
 		sendLog("error", "Can't do BF Test, next pointing is too soon");
 	}
 }
@@ -1616,26 +1616,10 @@ static MQTTStatus_t prvMQTTConnect( bool xCleanSession )
     bool xSessionPresent = false;
     MQTTPublishInfo_t willInfo = { 0 };
 
-    /* Many fields are not used in this demo so start with everything at 0. */
     memset( &xConnectInfo, 0x00, sizeof( xConnectInfo ) );
-
-    /* Start with a clean session i.e. direct the MQTT broker to discard any
-     * previous session data. Also, establishing a connection with clean session
-     * will ensure that the broker does not store any data when this client
-     * gets disconnected. */
     xConnectInfo.cleanSession = xCleanSession;
-
-    /* The client identifier is used to uniquely identify this MQTT client to
-     * the MQTT broker. In a production device the identifier can be something
-     * unique, such as a device serial number. */
     xConnectInfo.pClientIdentifier = bfc_name;
     xConnectInfo.clientIdentifierLength = ( uint16_t ) strlen( bfc_name );
-
-    /* Set MQTT keep-alive period. It is the responsibility of the application
-     * to ensure that the interval between Control Packets being sent does not
-     * exceed the Keep Alive value. In the absence of sending any other Control
-     * Packets, the Client MUST send a PINGREQ Packet.  This responsibility will
-     * be moved inside the agent. */
     xConnectInfo.keepAliveSeconds = KEEP_ALIVE_INTERVAL_SECONDS;
 
     // The last will and testament is optional, it will be published by the broker
@@ -1890,6 +1874,26 @@ static void sntpClient_SetTime( const SntpServerInfo_t * pTimeServer,
     	htim2.Instance->CNT = tim2Counter;
 		//printf("SNTP: Time set to %.lu s, TIM2: %.lu\n", unixTime, tim2Counter);
 
+    	RTC_TimeTypeDef rtc_time;
+		RTC_DateTypeDef rtc_date;
+		struct tm dateTime;
+
+		rtc_time.Hours = (unixSecs/3600) % 24;
+		rtc_time.Minutes = (unixSecs/60) % 60;
+		rtc_time.Seconds = unixSecs % 60;
+		rtc_time.SubSeconds = 107;
+		rtc_time.DayLightSaving = RTC_DAYLIGHTSAVING_NONE;
+		//rtc_time.StoreOperation = RTC_STOREOPERATION_RESET;
+
+		localtime_r((time_t*) &unixSecs, &dateTime);
+		if (dateTime.tm_wday == 0) rtc_date.WeekDay = 7; else rtc_date.WeekDay = dateTime.tm_wday;
+		rtc_date.Date = dateTime.tm_mday;
+		rtc_date.Month = dateTime.tm_mon +1;
+		rtc_date.Year = dateTime.tm_year % 100;
+
+		HAL_RTC_SetTime(&hrtc, &rtc_time, RTC_FORMAT_BIN);
+		HAL_RTC_SetDate(&hrtc, &rtc_date, RTC_FORMAT_BIN);
+
     }
 
 }
@@ -1909,18 +1913,13 @@ int32_t UdpTransport_Send( sntpNetworkContext_t * pNetworkContext,
 
     /* Send the buffer with ulFlags set to 0, so the FREERTOS_ZERO_COPY bit
      * is clear. */
-    bytesSent = FreeRTOS_sendto( /* The socket being send to. */
-        pNetworkContext->socket,
-        /* The data being sent. */
-        pBuffer,
-        /* The length of the data being sent. */
-        bytesToSend,
-        /* ulFlags with the FREERTOS_ZERO_COPY bit clear. */
-        0,
-        /* Where the data is being sent. */
-        &destinationAddress,
-        /* Not used but should be set as shown. */
-        sizeof( destinationAddress )
+    bytesSent = FreeRTOS_sendto(
+        pNetworkContext->socket, /* The socket being send to. */
+        pBuffer, /* The data being sent. */
+        bytesToSend, /* The length of the data being sent. */
+        0, /* ulFlags with the FREERTOS_ZERO_COPY bit clear. */
+        &destinationAddress, /* Where the data is being sent. */
+        sizeof( destinationAddress ) /* Not used but should be set as shown. */
         );
 
     return bytesSent;
@@ -1938,22 +1937,13 @@ static int32_t UdpTransport_Recv( sntpNetworkContext_t * pNetworkContext,
 
     /* Receive into the buffer with ulFlags set to 0, so the FREERTOS_ZERO_COPY bit
      * is clear. */
-    bytesReceived = FreeRTOS_recvfrom( /* The socket data is being received on. */
-        pNetworkContext->socket,
-
-        /* The buffer into which received data will be
-         * copied. */
-        pBuffer,
-
-        /* The length of the buffer into which data will be
-         * copied. */
-        bytesToRecv,
-        /* ulFlags with the FREERTOS_ZERO_COPY bit clear. */
-        0,
-        /* Will get set to the source of the received data. */
-        &sourceAddress,
-        /* Not used but should be set as shown. */
-        &addressLength
+    bytesReceived = FreeRTOS_recvfrom(
+        pNetworkContext->socket, /* The socket data is being received on. */
+        pBuffer, /* The buffer into which received data will be copied. */
+        bytesToRecv, /* The length of the buffer into which data will be copied. */
+        0, /* ulFlags with the FREERTOS_ZERO_COPY bit clear. */
+        &sourceAddress, /* Will get set to the source of the received data. */
+        &addressLength /* Not used but should be set as shown. */
         );
 
     /* If data is received from the network, discard the data if  received from a different source than

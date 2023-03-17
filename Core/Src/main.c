@@ -245,26 +245,26 @@ void gen_bitstring(int xdelays[], int ydelays[], char *outstring)
 {
 	int i=0, x=0, y=0, chksum=0;
 	char buffer[sizeof(int)*8+1] = "";
-	char xdelays_b[16*6+1] = "", ydelays_b[16*6+1] = ""; // Packed 16 x 6-bit binary delays (96 bits as string)
+	char xdelays_b[16*6+1] = "", ydelays_b[16*6+1] = ""; // Packed 16 x 6-bit (96 bits) binary delays as strings
 	int chk_words[12];
 
 	strcpy(outstring, "00000000111100000000000000000000"); // Preamble 32 bits
 	i = 32; // Start adding bits after preamble at pos 32
 
 	// Convert 16x xdelay integers into 6-bit binary values packed in a 96 bit string
-	for (x=0; x<=15; x++) {
+	for (x=0; x<=15; x++) { // For each integer in the xdelays array
 		intToXbits(xdelays[x], buffer, 6);
 		strcat(xdelays_b, buffer);
 	}
 	// Convert 16x ydelay integers into 6-bit binary values packed in a 96 bit string
-	for (y=0; y<=15; y++) {
+	for (y=0; y<=15; y++) { // For each integer in the ydelays array
 		intToXbits(ydelays[y], buffer, 6);
 		strcat(ydelays_b, buffer);
 	}
 
 	// Extract first 6x 16-bit integers from x delay packed string and add to output
-	for (x=0; x<=5; x++) {
-		for (y=0; y<=16; y++) {
+	for (x=0; x<=5; x++) { // For each word in the first group of 6
+		for (y=0; y<=16; y++) { // For each bit in the 16-bit word
 			if (y != 16) {
 				outstring[i] = xdelays_b[x*16+y];
 				buffer[y] = xdelays_b[x*16+y];
@@ -278,8 +278,8 @@ void gen_bitstring(int xdelays[], int ydelays[], char *outstring)
 		chk_words[x] = (int) strtol(buffer, NULL ,2);
 	}
 	// Extract the second 6x 16-bit integers from y delay packed string and add to output
-	for (x=6; x<=11; x++) {
-		for (y=0; y<=16; y++) {
+	for (x=6; x<=11; x++) { // For each word in the second group of 6
+		for (y=0; y<=16; y++) { // For each bit in the 16-bit word
 			if (y != 16) {
 				outstring[i] = ydelays_b[(x-6)*16+y];
 				buffer[y] = ydelays_b[(x-6)*16+y];
@@ -294,13 +294,13 @@ void gen_bitstring(int xdelays[], int ydelays[], char *outstring)
 	}
 
 	// Calculate checksum: the 12x 16-bit packed delay words XORed together
-	for (x=0; x<=11; x++) {
+	for (x=0; x<=11; x++) { // For each 16-bit word in the packed bit strings array
 		chksum = chksum ^ chk_words[x]; // Bitwise XOR
 	}
 
 	// Add 16-bit checksum to output string
 	intToXbits(chksum, buffer, 16);
-	for (x=0; x<=15; x++) {
+	for (x=0; x<=15; x++) { // For each bit in the checksum buffer
 		if(buffer[x] == '0' || buffer[x] == '1') outstring[i] = buffer[x];
 		else outstring[i] = '0';
 		i++;
@@ -317,6 +317,11 @@ void gen_bitstring(int xdelays[], int ydelays[], char *outstring)
 }
 
 void intToXbits(int value, char *buffer, int bits) {
+/*
+ * Converts the least-significant <bits> bits from <value> into a string of
+ * '1' and '0' chars in <*buffer> terminated with a \0. Caution: Does no
+ * checking of realistic values or if <*buffer> is large enough to hold the result.
+ */
 	int i = 0;
 	for (int mask = 0x01 << (bits - 1); mask > 0; mask >>= 1) {
 		buffer[i++] = (value & mask) ? '1':'0';
@@ -350,7 +355,7 @@ void send_bitstring_en(uint8_t bfEnable, float *bf_temp, uint8_t *bf_flags)
 	// Clock out 253 bits on all data/clock lines
 	for (i=0; i<253; i++) {
 		int portD = 0;
-		for (j=0; j<=7; j++) {
+		for (j=0; j<=7; j++) { // For each beamformer
 			if (beamformer[j].outstring[i] == '1' && (bfEnable && bitmask[j])) {
 				portD |= bitmask[j+8];
 			}
@@ -452,17 +457,17 @@ void parsePointing(const uint8_t *data, int len) {
 					}
 					gen_bitstring(xdelays, ydelays, beamformer[bfNumJSON->valueint - 1].outstring);
 					char message[50];
-					snprintf(message, 50, "BF: %d point scheduled %f", bfNumJSON->valueint, sendTimeJSON->valuedouble);
+					snprintf(message, 50, "BF: %d point scheduled %.f", bfNumJSON->valueint, sendTimeJSON->valuedouble);
 					sendLog("info",message);
 				} else {
 					sendLog("error", "MQTT Pointing Command Error: \'bf\' and/or \'time\' not valid");
-					printf("MQTT Pointing Command Error: \'bf\' and/or \'time\' not valid");
+					//printf("MQTT Pointing Command Error: \'bf\' and/or \'time\' not valid");
 				}
 			}
 		} else {
 			const char *error_ptr = cJSON_GetErrorPtr();
 			if (error_ptr != NULL) {
-				printf("JSON Parse error before: %s\n", error_ptr);
+				//printf("JSON Parse error before: %s\n", error_ptr);
 				sendLog("error", "point JSON parse error");
 			}
 		}
@@ -493,11 +498,13 @@ void parseBFPower(const uint8_t *data, int len){
 				}
 				GPIOE->BSRR = portE; // Set bit in lowest 16 bits to set pin, set in highest 16 bits to clear pin
 				sendLog("info", "bf_power set OK");
+			} else {
+				sendLog("error","bf_power JSON array error");
 			}
 		} else {
 			const char *error_ptr = cJSON_GetErrorPtr();
 			if (error_ptr != NULL) {
-				printf("bf_power JSON Parse error before: %s\n", error_ptr);
+				//printf("bf_power JSON Parse error before: %s\n", error_ptr);
 				sendLog("error", "bf_power JSON parse error");
 			}
 		}
@@ -532,11 +539,13 @@ void parseDoCPower(const uint8_t *data, int len){
 				}
 				GPIOE->BSRR = portE; // Set bit in lowest 16 bits to set pin, set in highest 16 bits to clear pin
 				sendLog("info", "doc_power set OK");
+			} else {
+				sendLog("error","doc_power JSON array error");
 			}
 		} else {
 			const char *error_ptr = cJSON_GetErrorPtr();
 			if (error_ptr != NULL) {
-				printf("DoCPower JSON Parse error before: %s\n", error_ptr);
+				//printf("DoCPower JSON Parse error before: %s\n", error_ptr);
 				sendLog("error", "doc_power JSON parse error");
 			}
 		}
@@ -553,8 +562,8 @@ void doBFTest() {
 
 	gen_bitstring(testxdelays, testydelays, output);
 	// Save the current beamformer outstrings and set them to 0 delays
-	for (i=0; i<=7; i++) {
-		for (j=0; j<255; j++) {
+	for (i=0; i<=7; i++) { // For each beamformer
+		for (j=0; j<255; j++) { // For each bit in the outstrings
 			saved_bitstrings[i][j] = beamformer[i].outstring[j];
 			beamformer[i].outstring[j] = output[j];
 		}
@@ -563,13 +572,13 @@ void doBFTest() {
 	bfController.lastPointTime = unixTime;
 	bfController.lastBFEnable = 0xFF;
 	// Restore the previous beamformer outstrings
-	for (i=0; i<=7; i++) {
-		for (j=0; j<255; j++) {
+	for (i=0; i<=7; i++) { // For each beamformer
+		for (j=0; j<255; j++) { // For each bit in the outstrings
 			beamformer[i].outstring[j] = saved_bitstrings[i][j];
 		}
 	}
-	for (i=0; i<=7; i++) {
-		for (j=0; j<=15; j++) {
+	for (i=0; i<=7; i++) { // For each beamformer
+		for (j=0; j<=15; j++) { // For each delay value
 			beamformer[i].lastXDelays[j] = 0;
 			beamformer[i].lastYDelays[j] = 0;
 		}
@@ -581,11 +590,11 @@ void doBFTest() {
 void sendBFPointing() {
 
 	uint8_t bfEnable = 0;
-	for (int i = 0; i <= 7; i++) {
+	for (int i = 0; i <= 7; i++) { // For each beamformer
 		if (beamformer[i].nextPointTime <= unixTime) {
 			bfEnable |= (0x01 << i);
 			beamformer[i].lastPointTime = unixTime;
-			for (int j = 0; j <= 15; j++) {
+			for (int j = 0; j <= 15; j++) { // For each delay value
 				beamformer[i].lastXDelays[j] = beamformer[i].nextXDelays[j];
 				beamformer[i].lastYDelays[j] = beamformer[i].nextYDelays[j];
 				beamformer[i].nextXDelays[j] = 0;

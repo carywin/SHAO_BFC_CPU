@@ -1,0 +1,5 @@
+FreeRTOS_TCP_Reception.c:96:16:prvCheckOptions	8
+FreeRTOS_TCP_Reception.c:197:20:prvSingleStepTCPHeaderOptions	21
+FreeRTOS_TCP_Reception.c:372:21:prvReadSackOption	3
+FreeRTOS_TCP_Reception.c:427:16:prvCheckRxData	4
+FreeRTOS_TCP_Reception.c:519:16:prvStoreRxData	9

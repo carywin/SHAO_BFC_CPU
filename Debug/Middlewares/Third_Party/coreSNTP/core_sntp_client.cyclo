@@ -1,0 +1,12 @@
+core_sntp_client.c:47:14:Sntp_Init	16
+core_sntp_client.c:150:17:calculateElapsedTimeMs	3
+core_sntp_client.c:202:21:validateContext	17
+core_sntp_client.c:288:21:sendSntpPacket	6
+core_sntp_client.c:386:21:addClientAuthentication	3
+core_sntp_client.c:431:14:Sntp_SendTimeRequest	7
+core_sntp_client.c:527:13:rotateServerForNextTimeQuery	1
+core_sntp_client.c:564:21:receiveSntpResponse	4
+core_sntp_client.c:633:21:processServerResponse	13
+core_sntp_client.c:764:13:decideAboutReadRetry	3
+core_sntp_client.c:819:14:Sntp_ReceiveTimeResponse	6
+core_sntp_client.c:895:14:Sntp_StatusToStr	14

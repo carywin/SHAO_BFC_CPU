@@ -1,0 +1,4 @@
+FreeRTOS_DNS_Networking.c:45:14:DNS_CreateSocket	3
+FreeRTOS_DNS_Networking.c:95:16:DNS_SendRequest	2
+FreeRTOS_DNS_Networking.c:129:10:DNS_ReadReply	1
+FreeRTOS_DNS_Networking.c:149:10:DNS_CloseSocket	1

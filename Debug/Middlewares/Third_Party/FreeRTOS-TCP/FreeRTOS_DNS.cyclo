@@ -1,0 +1,11 @@
+FreeRTOS_DNS.c:161:18:FreeRTOS_gethostbyname	1
+FreeRTOS_DNS.c:207:25:prvPrepareLookup	10
+FreeRTOS_DNS.c:350:22:prvGetPayloadBuffer	2
+FreeRTOS_DNS.c:386:17:prvFillSockAddress	1
+FreeRTOS_DNS.c:423:21:prvDNSReply	3
+FreeRTOS_DNS.c:470:23:prvSendBuffer	3
+FreeRTOS_DNS.c:521:21:prvGetHostByNameOp	3
+FreeRTOS_DNS.c:578:21:prvGetHostByNameOp_WithRetry	3
+FreeRTOS_DNS.c:611:21:prvGetHostByName	3
+FreeRTOS_DNS.c:651:20:prvCreateDNSMessage	4
+FreeRTOS_DNS.c:765:14:ulDNSHandlePacket	3

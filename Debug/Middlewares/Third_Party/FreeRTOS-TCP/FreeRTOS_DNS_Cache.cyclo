@@ -1,0 +1,8 @@
+FreeRTOS_DNS_Cache.c:103:14:FreeRTOS_dnslookup	1
+FreeRTOS_DNS_Cache.c:124:16:FreeRTOS_dns_update	1
+FreeRTOS_DNS_Cache.c:139:10:FreeRTOS_dnsclear	1
+FreeRTOS_DNS_Cache.c:157:16:FreeRTOS_ProcessDNSCache	8
+FreeRTOS_DNS_Cache.c:225:23:prvFindEntryIndex	4
+FreeRTOS_DNS_Cache.c:259:23:prvGetCacheIPEntry	2
+FreeRTOS_DNS_Cache.c:309:17:prvUpdateCacheEntry	2
+FreeRTOS_DNS_Cache.c:339:17:prvInsertCacheEntry	3

@@ -1,0 +1,17 @@
+core_cm4.h:2064:26:ITM_SendChar	4
+main.c:90:6:ActivateEthPhy	1
+main.c:95:6:DeactivateEthPhy	1
+main.c:100:6:delay_us	2
+main.c:111:1:__io_putchar	1
+main.c:126:5:main	1
+main.c:197:6:SystemClock_Config	3
+main.c:241:6:gen_bitstring	14
+main.c:319:6:intToXbits	3
+main.c:332:6:send_bitstring_en	26
+main.c:426:6:parsePointing	16
+main.c:478:6:parseBFPower	10
+main.c:515:6:parseDoCPower	10
+main.c:556:6:doBFTest	7
+main.c:590:6:sendBFPointing	4
+main.c:622:6:HAL_TIM_PeriodElapsedCallback	3
+main.c:641:6:Error_Handler	1

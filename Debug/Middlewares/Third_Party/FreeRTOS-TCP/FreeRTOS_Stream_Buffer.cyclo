@@ -1,0 +1,12 @@
+FreeRTOS_Stream_Buffer.c:56:8:uxStreamBufferSpace	2
+FreeRTOS_Stream_Buffer.c:79:8:uxStreamBufferDistance	2
+FreeRTOS_Stream_Buffer.c:102:8:uxStreamBufferGetSpace	1
+FreeRTOS_Stream_Buffer.c:117:8:uxStreamBufferFrontSpace	1
+FreeRTOS_Stream_Buffer.c:133:8:uxStreamBufferGetSize	1
+FreeRTOS_Stream_Buffer.c:148:8:uxStreamBufferMidSpace	1
+FreeRTOS_Stream_Buffer.c:161:6:vStreamBufferClear	1
+FreeRTOS_Stream_Buffer.c:177:6:vStreamBufferMoveMid	3
+FreeRTOS_Stream_Buffer.c:210:12:xStreamBufferLessThenEqual	2
+FreeRTOS_Stream_Buffer.c:238:8:uxStreamBufferGetPtr	1
+FreeRTOS_Stream_Buffer.c:262:8:uxStreamBufferAdd	10
+FreeRTOS_Stream_Buffer.c:363:8:uxStreamBufferGet	10

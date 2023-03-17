@@ -1,0 +1,4 @@
+transport_plaintext.c:53:28:Plaintext_FreeRTOS_Connect	5
+transport_plaintext.c:98:28:Plaintext_FreeRTOS_Disconnect	3
+transport_plaintext.c:118:9:Plaintext_FreeRTOS_recv	5
+transport_plaintext.c:152:9:Plaintext_FreeRTOS_send	5

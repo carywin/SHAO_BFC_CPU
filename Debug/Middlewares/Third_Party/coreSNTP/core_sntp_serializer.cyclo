@@ -1,0 +1,12 @@
+core_sntp_serializer.c:221:13:fillWordMemoryInNetworkOrder	1
+core_sntp_serializer.c:241:17:readWordFromNetworkByteOrderMemory	1
+core_sntp_serializer.c:261:16:absoluteOf	2
+core_sntp_serializer.c:279:13:isZeroTimestamp	3
+core_sntp_serializer.c:294:17:fractionsToMs	1
+core_sntp_serializer.c:316:16:safeTimeDifference	5
+core_sntp_serializer.c:448:13:calculateClockOffset	1
+core_sntp_serializer.c:511:21:parseValidSntpResponse	6
+core_sntp_serializer.c:605:14:Sntp_SerializeRequest	5
+core_sntp_serializer.c:673:14:Sntp_DeserializeResponse	13
+core_sntp_serializer.c:748:14:Sntp_CalculatePollInterval	6
+core_sntp_serializer.c:812:14:Sntp_ConvertToUnixTime	7

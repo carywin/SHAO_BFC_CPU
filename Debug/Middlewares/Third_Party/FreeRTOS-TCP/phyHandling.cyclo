@@ -1,0 +1,9 @@
+phyHandling.c:151:19:xHas_1F_PHYSPCS	7
+phyHandling.c:185:19:xHas_19_PHYCR	5
+phyHandling.c:208:6:vPhyInitialise	1
+phyHandling.c:220:12:xPhyDiscover	4
+phyHandling.c:264:17:xPhyReset	8
+phyHandling.c:338:12:xPhyConfigure	21
+phyHandling.c:505:12:xPhyFixedValue	5
+phyHandling.c:541:12:xPhyStartAutoNegotiation	30
+phyHandling.c:759:12:xPhyCheckLinkStatus	10

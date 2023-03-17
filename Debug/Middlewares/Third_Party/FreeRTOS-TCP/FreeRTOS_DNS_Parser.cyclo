@@ -1,0 +1,4 @@
+FreeRTOS_DNS_Parser.c:62:12:DNS_ReadNameField	14
+FreeRTOS_DNS_Parser.c:175:12:DNS_SkipNameField	9
+FreeRTOS_DNS_Parser.c:253:14:DNS_ParseDNSReply	10
+FreeRTOS_DNS_Parser.c:532:14:parseDNSAnswer	16

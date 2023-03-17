@@ -1,0 +1,4 @@
+tcp_sockets_wrapper.c:86:12:TCP_Sockets_Connect	10
+tcp_sockets_wrapper.c:188:6:TCP_Sockets_Disconnect	5
+tcp_sockets_wrapper.c:227:9:TCP_Sockets_Send	11
+tcp_sockets_wrapper.c:291:9:TCP_Sockets_Recv	9
